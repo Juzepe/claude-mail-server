@@ -35,7 +35,7 @@ A lightweight, self-hosted mail server with a web admin panel. Built to run on a
 ## Install
 
 ```bash
-git clone https://github.com/Juzepe/claude-mail-server.git /opt/mailserver
+sudo git clone https://github.com/Juzepe/claude-mail-server.git /opt/mailserver
 cd /opt/mailserver
 sudo bash install.sh
 ```
