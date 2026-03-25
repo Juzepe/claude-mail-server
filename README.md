@@ -1,91 +1,84 @@
-# Mail Server
+# Claude Mail Server
 
-A lightweight, self-hosted mail server with a web-based admin UI. Runs comfortably on a $4-6/mo DigitalOcean droplet (512MB-1GB RAM).
+A lightweight, self-hosted mail server with a web admin panel. Built to run on a $4–6/mo DigitalOcean droplet (512MB RAM minimum). One command to install.
 
-**Stack:** Postfix + Dovecot + OpenDKIM + Go web UI + SQLite + Let's Encrypt
+**Stack:** Postfix · Dovecot · OpenDKIM · Go web UI · SQLite · Let's Encrypt
 
 ---
 
 ## Features
 
-- Single bash installer — run one command on a fresh Ubuntu server
-- Web admin panel (dark theme) — create/delete email accounts, view DNS setup
-- Postfix for SMTP with SASL auth and rate limiting
-- Dovecot for IMAP/POP3 with virtual mailboxes (Maildir format)
-- OpenDKIM for email signing (DKIM)
-- Let's Encrypt SSL/TLS — auto-renewed
-- SPF, DKIM, DMARC guidance
-- App credential pages with Laravel, PHP, and Node.js examples
+- **One-command installer** — runs on any fresh Ubuntu/Debian server
+- **Web admin panel** at `https://mail.yourdomain.com` — separate from your main website
+- **Virtual mailboxes** — create and delete email accounts via the UI or CLI
+- **Email browser** — view sent and received emails per account directly in the panel
+- **App credentials page** — ready-to-paste config for Laravel, PHPMailer, Nodemailer
+- **DNS setup guide** — shows your exact SPF, DKIM, DMARC, and MX records
+- **Auto-renewing TLS** via Let's Encrypt (no nginx required)
+- **DKIM signing** on all outgoing mail via OpenDKIM
+- **SASL auth** — Postfix authenticates through Dovecot
+- Enforces TLS 1.2+, bcrypt admin passwords, secure session cookies
 
 ---
 
 ## Requirements
 
-- Ubuntu 20.04, 22.04, or 24.04 (or Debian 11/12)
+- Ubuntu 20.04 / 22.04 / 24.04 or Debian 11 / 12
 - A domain name with DNS control
-- A VPS with a dedicated IP address
-- Port 25 open (some providers block it — DigitalOcean allows it by request)
+- A VPS with a **dedicated IP** and **port 25 open** (DigitalOcean requires a support request to unblock port 25)
 - Root access
 
-**Minimum specs:** 512MB RAM, 1 vCPU, 20GB SSD
+**Minimum specs:** 512 MB RAM · 1 vCPU · 20 GB SSD
 
 ---
 
-## Quick Install
+## Install
 
 ```bash
-# On a fresh Ubuntu 22.04 server, as root:
-git clone https://github.com/yourusername/mailserver.git /opt/mailserver-src
-cd /opt/mailserver-src
-chmod +x install.sh
-sudo ./install.sh
+git clone https://github.com/Juzepe/claude-mail-server.git /opt/mailserver
+cd /opt/mailserver
+sudo bash install.sh
 ```
 
-The installer will prompt you for:
-- Your mail domain (e.g., `example.com`)
-- Admin email address (e.g., `admin@example.com`)
-- Admin panel password
+The installer will ask for:
 
-After installation, visit `https://yourdomain.com` to access the admin panel.
+- **Mail domain** — e.g. `example.com` (this becomes your email domain: `you@example.com`)
+- **Admin email** — e.g. `admin@example.com`
+- **Admin password** — minimum 8 characters
+
+When it finishes, it prints all DNS records you need to add and the URL to your admin panel.
 
 ---
 
-## Post-Install DNS Setup
+## DNS Setup
 
-Add these DNS records at your registrar/DNS provider:
+After installation, add these records at your DNS provider:
 
-| Type | Name             | Value                                      |
-|------|------------------|--------------------------------------------|
-| A    | `mail`           | `<your server IP>`                         |
-| MX   | `@`              | `mail.yourdomain.com` (priority 10)        |
-| TXT  | `@`              | `v=spf1 mx a:mail.yourdomain.com ~all`     |
-| TXT  | `mail._domainkey`| `v=DKIM1; k=rsa; p=<key from DNS page>`    |
-| TXT  | `_dmarc`         | `v=DMARC1; p=quarantine; rua=mailto:postmaster@yourdomain.com` |
+| Type | Name              | Value                                                              |
+|------|-------------------|--------------------------------------------------------------------|
+| A    | `mail`            | `<your server IP>`                                                 |
+| MX   | `@`               | `mail.yourdomain.com` (priority 10)                                |
+| TXT  | `@`               | `v=spf1 mx a:mail.yourdomain.com ~all`                             |
+| TXT  | `mail._domainkey` | `v=DKIM1; k=rsa; p=<key>` (shown in admin panel → DNS Setup)      |
+| TXT  | `_dmarc`          | `v=DMARC1; p=quarantine; rua=mailto:postmaster@yourdomain.com`     |
 
-The exact values (including your DKIM public key) are shown in the admin panel under **DNS Setup**.
+Your exact DKIM public key is shown in the admin panel under **DNS Setup** after installation.
 
-**Important:** Also ask your hosting provider to set a **PTR (reverse DNS)** record for your server IP pointing to `mail.yourdomain.com`. This is critical for avoiding spam classification.
+> **PTR record:** Ask your hosting provider to set a reverse DNS (PTR) record for your server IP pointing to `mail.yourdomain.com`. This is important for avoiding spam filters.
 
 ---
 
-## Managing Email Accounts
+## Admin Panel
 
-### Via the Web UI
+The admin panel runs at **`https://mail.yourdomain.com`** — a subdomain, so your main website at `yourdomain.com` is unaffected.
 
-1. Go to `https://yourdomain.com`
-2. Log in with your admin email and password
-3. Click **Email Accounts**
-4. Fill in the email address and password, click **Create Account**
-
-### Via command line
-
-```bash
-# Add a user
-mailserver-web -adduser user@example.com secretpassword
-
-# Or use make
-make show-users
-```
+| Page             | Description                                              |
+|------------------|----------------------------------------------------------|
+| Dashboard        | Service status, disk usage, recent activity              |
+| Email Accounts   | Create and delete mailboxes                              |
+| Browse Emails    | View inbox and sent mail per account                     |
+| App Credentials  | Copy-paste SMTP/IMAP config for apps                     |
+| DNS Setup        | Your exact DNS records including DKIM public key         |
 
 ---
 
@@ -98,7 +91,7 @@ MAIL_MAILER=smtp
 MAIL_HOST=mail.yourdomain.com
 MAIL_PORT=587
 MAIL_USERNAME=noreply@yourdomain.com
-MAIL_PASSWORD=your_email_password
+MAIL_PASSWORD=your_password
 MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS=noreply@yourdomain.com
 MAIL_FROM_NAME="${APP_NAME}"
@@ -109,9 +102,6 @@ MAIL_FROM_NAME="${APP_NAME}"
 ## Using with PHP (PHPMailer)
 
 ```php
-<?php
-use PHPMailer\PHPMailer\PHPMailer;
-
 $mail = new PHPMailer(true);
 $mail->isSMTP();
 $mail->Host       = 'mail.yourdomain.com';
@@ -120,12 +110,6 @@ $mail->Username   = 'noreply@yourdomain.com';
 $mail->Password   = 'your_password';
 $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
 $mail->Port       = 587;
-
-$mail->setFrom('noreply@yourdomain.com', 'Your App');
-$mail->addAddress('recipient@example.com');
-$mail->Subject = 'Hello';
-$mail->Body    = 'Test email from my server.';
-$mail->send();
 ```
 
 ---
@@ -133,23 +117,11 @@ $mail->send();
 ## Using with Node.js (Nodemailer)
 
 ```javascript
-const nodemailer = require('nodemailer');
-
 const transporter = nodemailer.createTransport({
   host: 'mail.yourdomain.com',
   port: 587,
-  secure: false,
-  auth: {
-    user: 'noreply@yourdomain.com',
-    pass: 'your_password'
-  }
-});
-
-await transporter.sendMail({
-  from: '"My App" <noreply@yourdomain.com>',
-  to: 'recipient@example.com',
-  subject: 'Hello',
-  text: 'Test email'
+  secure: false, // STARTTLS
+  auth: { user: 'noreply@yourdomain.com', pass: 'your_password' }
 });
 ```
 
@@ -157,64 +129,25 @@ await transporter.sendMail({
 
 ## Connection Settings (Mail Clients)
 
-| Setting          | Value                    |
-|------------------|--------------------------|
-| SMTP Host        | `mail.yourdomain.com`    |
-| SMTP Port        | `587` (STARTTLS)         |
-| SMTP Alt Port    | `465` (SSL/TLS)          |
-| IMAP Host        | `mail.yourdomain.com`    |
-| IMAP Port        | `993` (SSL/TLS)          |
-| POP3 Port        | `995` (SSL/TLS)          |
-| Username         | Full email address       |
-| Authentication   | Normal password          |
+| Setting       | Value                         |
+|---------------|-------------------------------|
+| SMTP Host     | `mail.yourdomain.com`         |
+| SMTP Port     | `587` (STARTTLS)              |
+| SMTP Port     | `465` (SSL/TLS)               |
+| IMAP Host     | `mail.yourdomain.com`         |
+| IMAP Port     | `993` (SSL/TLS)               |
+| POP3 Port     | `995` (SSL/TLS)               |
+| Username      | Full email address            |
+| Auth          | Normal password               |
 
 ---
 
-## Project Structure
-
-```
-mailserver/
-├── install.sh              # One-command installer
-├── Makefile                # Build targets
-├── configs/
-│   ├── postfix-main.cf.template
-│   ├── postfix-master.cf
-│   ├── dovecot.conf.template
-│   └── opendkim.conf.template
-├── systemd/
-│   └── mailserver-web.service
-└── web/                    # Go web application
-    ├── main.go
-    ├── go.mod
-    ├── config/config.go
-    ├── db/db.go
-    ├── mail/manager.go
-    ├── handlers/
-    │   ├── auth.go
-    │   ├── dashboard.go
-    │   ├── users.go
-    │   ├── emails.go
-    │   ├── credentials.go
-    │   └── dns.go
-    ├── middleware/auth.go
-    ├── templates/
-    │   ├── layout.html
-    │   ├── login.html
-    │   ├── dashboard.html
-    │   ├── users.html
-    │   ├── emails.html
-    │   ├── credentials.html
-    │   └── dns.html
-    └── static/
-        ├── style.css
-        └── app.js
-```
-
----
-
-## Maintenance
+## Managing Accounts via CLI
 
 ```bash
+# Add a mailbox
+mailserver-web -adduser user@example.com secretpassword
+
 # Check service status
 make status
 
@@ -223,10 +156,10 @@ make logs
 journalctl -u postfix -f
 journalctl -u dovecot -f
 
-# Renew SSL certificate (runs automatically, but manual trigger):
-make cert-renew
+# Renew SSL certificate (runs automatically, but can be forced)
+certbot renew --force-renewal
 
-# Rebuild and reinstall web UI
+# Rebuild and reinstall web UI after changes
 make install
 
 # Restart all services
@@ -235,48 +168,81 @@ systemctl restart postfix dovecot opendkim mailserver-web
 
 ---
 
-## Security Notes
+## Project Structure
 
-- The admin panel is accessible over HTTPS only. HTTP redirects to HTTPS.
-- Sessions expire after 24 hours.
-- Passwords are stored as bcrypt hashes.
-- TLS 1.2+ is enforced for all connections (SMTP, IMAP).
-- The `vmail` user (uid 5000) owns all mail data. No process runs as root unnecessarily.
-- DKIM signing prevents email spoofing.
-- DMARC quarantine policy is set by default — change to `p=reject` once you've confirmed delivery is working.
-- Rate limiting is enabled in Postfix to prevent abuse.
-- Firewall rules are applied via `ufw` during installation.
+```
+mailserver/
+├── install.sh                  # One-command installer
+├── Makefile
+├── configs/
+│   ├── postfix-main.cf.template
+│   ├── postfix-master.cf
+│   ├── dovecot.conf.template
+│   └── opendkim.conf.template
+├── systemd/
+│   └── mailserver-web.service
+└── web/                        # Go web application
+    ├── main.go
+    ├── go.mod
+    ├── config/config.go
+    ├── db/db.go
+    ├── mail/manager.go
+    ├── handlers/
+    ├── middleware/
+    ├── templates/
+    └── static/
+```
 
-**Change default settings for production:**
-- Set a strong admin password (min 16 chars)
-- After verifying mail is working, change DMARC policy to `p=reject`
-- Consider adding fail2ban for SSH and mail port brute-force protection
-- Enable unattended-upgrades for automatic security patches
+---
+
+## Security
+
+- Admin panel accessible over HTTPS only; HTTP redirects to HTTPS
+- Sessions expire after 24 hours
+- Admin password stored as bcrypt hash
+- TLS 1.2+ enforced on SMTP and IMAP
+- Mail data owned by `vmail` user (uid 5000) — no unnecessary root processes
+- DKIM signing prevents spoofing
+- DMARC set to `p=quarantine` by default — change to `p=reject` once delivery is confirmed working
+- Postfix rate limiting enabled to prevent abuse
+- `ufw` firewall rules applied during install
+
+**Recommended after install:**
+- Use a strong admin password (16+ chars)
+- Switch DMARC to `p=reject` after verifying mail delivery works
+- Install `fail2ban` for SSH and mail port brute-force protection
+- Enable `unattended-upgrades` for automatic security patches
 
 ---
 
 ## Troubleshooting
 
-**Mail not being received:**
-- Check MX record is set correctly: `dig MX yourdomain.com`
-- Check postfix is running: `systemctl status postfix`
-- Check logs: `tail -f /var/log/mail.log`
+**Mail not being received**
+```bash
+dig MX yourdomain.com          # Check MX record
+systemctl status postfix       # Check service
+tail -f /var/log/mail.log      # Check logs
+```
 
-**Mail going to spam:**
-- Verify SPF, DKIM, DMARC records are all set
-- Test at https://mail-tester.com
-- Ensure PTR record matches your hostname
+**Mail going to spam**
+- Verify SPF, DKIM, and DMARC records are all set correctly
+- Test your score at https://mail-tester.com
+- Ensure your PTR (reverse DNS) record matches `mail.yourdomain.com`
 
-**TLS errors:**
-- Check certificate: `openssl s_client -connect mail.yourdomain.com:587 -starttls smtp`
-- Renew cert: `certbot renew --force-renewal`
+**TLS errors**
+```bash
+openssl s_client -connect mail.yourdomain.com:587 -starttls smtp
+certbot renew --force-renewal
+```
 
-**Can't send email (authentication failed):**
-- Verify the email account exists: `make show-users`
-- Check Dovecot auth logs: `journalctl -u dovecot | grep auth`
+**Authentication failed**
+```bash
+make show-users                            # Verify account exists
+journalctl -u dovecot | grep auth         # Check auth logs
+```
 
 ---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT
