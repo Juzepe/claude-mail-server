@@ -1,0 +1,79 @@
+# =============================================================================
+# .gitignore — Mail Server Project
+# =============================================================================
+
+# Build output
+mailserver-web
+web/mailserver-web
+*.exe
+*.out
+
+# Go module cache
+/vendor/
+go.sum
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Go build cache
+.cache/
+
+# Test output
+*.test
+*.prof
+coverage.out
+coverage.html
+
+# --- Runtime / deployment secrets (NEVER commit these) ---
+/etc/mailserver/
+config.env
+*.env
+.env.*
+!.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+/etc/opendkim/keys/
+/etc/letsencrypt/
+
+# Mail data
+/var/mail/
+/var/lib/mailserver/
+
+# Postfix runtime files
+/etc/postfix/vmailbox.db
+/etc/postfix/virtual.db
+
+# Dovecot runtime
+/etc/dovecot/users
+
+# Log files
+*.log
+/var/log/
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Package manager
+node_modules/

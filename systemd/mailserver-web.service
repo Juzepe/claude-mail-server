@@ -1,0 +1,44 @@
+[Unit]
+Description=Mail Server Web Admin UI
+Documentation=https://github.com/yourusername/mailserver
+After=network-online.target
+Wants=network-online.target
+After=postfix.service dovecot.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# Binary location
+ExecStart=/usr/local/bin/mailserver-web
+
+# Config file path (loaded by the app itself)
+Environment=MAILSERVER_CONFIG=/etc/mailserver/config.env
+
+# Working directory
+WorkingDirectory=/opt/mailserver
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitBurst=5
+StartLimitIntervalSec=60s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mailserver-web
+
+# Resource limits (appropriate for small VPS)
+LimitNOFILE=65536
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

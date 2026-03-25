@@ -1,0 +1,184 @@
+{{define "title"}}Dashboard — Mail Admin{{end}}
+{{define "nav_dashboard"}}active{{end}}
+{{define "page_title"}}Dashboard{{end}}
+
+{{define "content"}}
+{{if .Flash}}
+<div class="alert alert-success flash-banner" id="flashMsg">{{.Flash}}</div>
+{{end}}
+{{if .Error}}
+<div class="alert alert-error flash-banner" id="flashMsg">{{.Error}}</div>
+{{end}}
+
+<!-- Stat Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon stat-icon-blue">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <div class="stat-value">{{.AccountCount}}</div>
+            <div class="stat-label">Email Accounts</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-icon-purple">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <div class="stat-value">{{.DiskUsage}}</div>
+            <div class="stat-label">Mail Storage</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-icon-green">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <div class="stat-value">{{.ServerSummary}}</div>
+            <div class="stat-label">Server Status</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-icon-orange">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <div class="stat-value">{{.Domain}}</div>
+            <div class="stat-label">Active Domain</div>
+        </div>
+    </div>
+</div>
+
+<div class="content-grid">
+    <!-- Services Status -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Service Status
+            </h2>
+        </div>
+        <div class="card-body">
+            {{range .Services}}
+            <div class="service-row">
+                <div class="service-info">
+                    <div class="service-dot {{if .Active}}dot-green{{else}}dot-red{{end}}"></div>
+                    <span class="service-name">{{.Name}}</span>
+                </div>
+                <span class="service-badge {{if .Active}}badge-success{{else}}badge-error{{end}}">
+                    {{if .Active}}Running{{else}}{{.Status}}{{end}}
+                </span>
+            </div>
+            {{else}}
+            <p class="text-muted">Service status unavailable (systemd not accessible)</p>
+            {{end}}
+
+            <div class="service-actions">
+                <a href="/users" class="btn btn-sm btn-secondary">Manage Accounts</a>
+                <a href="/dns" class="btn btn-sm btn-secondary">DNS Setup</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10 9 9 9 8 9"/>
+                </svg>
+                Recent Activity
+            </h2>
+        </div>
+        <div class="card-body">
+            {{if .AuditLog}}
+            <div class="audit-list">
+                {{range .AuditLog}}
+                <div class="audit-row">
+                    <div class="audit-action">
+                        <span class="audit-badge {{.ActionClass}}">{{.Action}}</span>
+                        {{if .Target}}<span class="audit-target">{{.Target}}</span>{{end}}
+                    </div>
+                    <div class="audit-meta">
+                        <span class="audit-time">{{.Timestamp.Format "Jan 2, 15:04"}}</span>
+                        {{if .IPAddr}}<span class="audit-ip">{{.IPAddr}}</span>{{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+            {{else}}
+            <p class="text-muted text-center">No activity recorded yet.</p>
+            {{end}}
+        </div>
+    </div>
+</div>
+
+<!-- Quick Start -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Quick Start Guide
+        </h2>
+    </div>
+    <div class="card-body">
+        <div class="steps-list">
+            <div class="step-item">
+                <div class="step-num">1</div>
+                <div class="step-text">
+                    <strong>Configure DNS</strong> — Add the MX, SPF, DKIM, and DMARC records to your domain.
+                    <a href="/dns" class="link">View DNS records →</a>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">2</div>
+                <div class="step-text">
+                    <strong>Create email accounts</strong> — Add mailboxes for your users.
+                    <a href="/users" class="link">Manage accounts →</a>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">3</div>
+                <div class="step-text">
+                    <strong>Configure your app</strong> — Use the SMTP/IMAP credentials in your application.
+                    <a href="/credentials" class="link">View credentials →</a>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">4</div>
+                <div class="step-text">
+                    <strong>Test sending</strong> — Send a test email and verify it arrives without spam flags.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}

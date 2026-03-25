@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"/home/juzepe/Projects/claude/mail server\" -type f -exec wc -l {} +)",
+      "Bash(gh auth:*)",
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(pip install:*)",
+      "Bash(snap install:*)",
+      "Bash(echo \"snap exit: $?\")"
+    ]
+  }
+}

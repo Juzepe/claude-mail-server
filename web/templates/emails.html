@@ -1,0 +1,140 @@
+{{define "title"}}Browse Emails — Mail Admin{{end}}
+{{define "nav_emails"}}active{{end}}
+{{define "page_title"}}Browse Emails{{end}}
+
+{{define "content"}}
+{{if .Error}}
+<div class="alert alert-error flash-banner" id="flashMsg">{{.Error}}</div>
+{{end}}
+
+<!-- Account & folder selector -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="/emails" class="email-selector-form">
+            <div class="selector-row">
+                <div class="form-group selector-group">
+                    <label for="account" class="form-label">Email Account</label>
+                    <select id="account" name="account" class="form-select" onchange="this.form.submit()">
+                        <option value="">— Select account —</option>
+                        {{range .Users}}
+                        <option value="{{.Email}}" {{if eq $.SelectedAccount .Email}}selected{{end}}>
+                            {{.Email}}
+                        </option>
+                        {{end}}
+                    </select>
+                </div>
+
+                {{if .SelectedAccount}}
+                <div class="form-group selector-group">
+                    <label for="folder" class="form-label">Folder</label>
+                    <select id="folder" name="folder" class="form-select" onchange="this.form.submit()">
+                        {{$sel := .SelectedFolder}}
+                        {{range .Folders}}
+                        <option value="{{.}}" {{if eq . $sel}}selected{{end}}>{{.}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <input type="hidden" name="account" value="{{.SelectedAccount}}">
+                {{end}}
+            </div>
+        </form>
+    </div>
+</div>
+
+{{if .SelectedAccount}}
+<div class="email-browser">
+    <!-- Email list -->
+    <div class="card email-list-card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+                {{.SelectedFolder}} ({{len .Emails}})
+            </h2>
+        </div>
+        <div class="card-body p-0">
+            {{if .Emails}}
+            <div class="email-list">
+                {{range .Emails}}
+                <a href="/emails?account={{$.SelectedAccount}}&folder={{$.SelectedFolder}}&uid={{.UID}}"
+                   class="email-item {{if not .Seen}}email-unread{{end}} {{if and $.SelectedEmail (eq $.SelectedEmail.UID .UID)}}email-selected{{end}}">
+                    <div class="email-sender">{{.From}}</div>
+                    <div class="email-subject">{{if .Subject}}{{.Subject}}{{else}}(no subject){{end}}</div>
+                    <div class="email-date">{{.Date.Format "Jan 2"}}</div>
+                </a>
+                {{end}}
+            </div>
+            {{else}}
+            <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+                <p>No emails in this folder.</p>
+            </div>
+            {{end}}
+        </div>
+    </div>
+
+    <!-- Email viewer -->
+    <div class="card email-viewer-card" id="emailViewer">
+        {{if .SelectedEmail}}
+        <div class="card-header">
+            <h2 class="card-title email-viewer-subject">
+                {{if .SelectedEmail.Subject}}{{.SelectedEmail.Subject}}{{else}}(no subject){{end}}
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="email-meta">
+                <div class="email-meta-row">
+                    <span class="email-meta-label">From:</span>
+                    <span>{{.SelectedEmail.From}}</span>
+                </div>
+                <div class="email-meta-row">
+                    <span class="email-meta-label">Date:</span>
+                    <span>{{.SelectedEmail.Date.Format "Monday, January 2, 2006 at 15:04"}}</span>
+                </div>
+                <div class="email-meta-row">
+                    <span class="email-meta-label">Account:</span>
+                    <span>{{.SelectedAccount}}</span>
+                </div>
+            </div>
+            <div class="email-body">
+                <pre class="email-body-text">{{.SelectedEmail.Body}}</pre>
+            </div>
+        </div>
+        {{else}}
+        <div class="card-body">
+            <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <p>Select an email to read it.</p>
+                {{if .Error}}
+                <p class="text-muted text-sm">Note: IMAP browsing requires Dovecot master auth configuration.</p>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{else}}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            <p>Select an email account above to browse its mailbox.</p>
+            {{if not .Users}}
+            <p class="text-muted">No email accounts yet. <a href="/users" class="link">Create one →</a></p>
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}
+{{end}}

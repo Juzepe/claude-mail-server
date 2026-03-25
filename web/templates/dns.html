@@ -1,0 +1,163 @@
+{{define "title"}}DNS Setup — Mail Admin{{end}}
+{{define "nav_dns"}}active{{end}}
+{{define "page_title"}}DNS Setup{{end}}
+
+{{define "content"}}
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="info-banner">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <div>
+                <strong>Configure these DNS records</strong> at your domain registrar or DNS provider (Cloudflare, Route 53, etc.)
+                for domain <strong>{{.Domain}}</strong>. DNS changes can take up to 24-48 hours to propagate.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DNS Records Table -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            Required DNS Records
+        </h2>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-wrapper">
+            <table class="table dns-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Name / Host</th>
+                        <th>Value / Content</th>
+                        <th>TTL</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range $i, $r := .DNSRecords}}
+                    <tr>
+                        <td><span class="dns-type dns-type-{{$r.Type}}">{{$r.Type}}</span></td>
+                        <td><code class="inline-code">{{$r.Name}}</code></td>
+                        <td>
+                            <div class="dns-value-wrap">
+                                <code class="dns-value" id="dnsval-{{$i}}">{{$r.Value}}</code>
+                            </div>
+                            <div class="dns-note">{{$r.Note}}</div>
+                        </td>
+                        <td class="text-muted">{{$r.TTL}}</td>
+                        <td>
+                            <button class="copy-btn" onclick="copyCode('dnsval-{{$i}}')" title="Copy value">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- DKIM Key detail -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+            </svg>
+            DKIM Public Key (Full)
+        </h2>
+    </div>
+    <div class="card-body">
+        {{if .DKIMFound}}
+        <p class="text-muted mb-2">Use this as the TXT record value for <code class="inline-code">mail._domainkey.{{.Domain}}</code>:</p>
+        <div class="dkim-key-block">
+            <code id="dkimFullKey">v=DKIM1; k=rsa; p={{.DKIMKey}}</code>
+        </div>
+        <button class="btn btn-sm btn-secondary mt-2" onclick="copyCode('dkimFullKey')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            Copy Full DKIM Record
+        </button>
+        {{else}}
+        <div class="alert alert-error">
+            DKIM key file not found at <code>/etc/opendkim/keys/{{.Domain}}/mail.txt</code>.
+            Run the installer to generate DKIM keys.
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<!-- Verification Tips -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Verification &amp; Testing
+        </h2>
+    </div>
+    <div class="card-body">
+        <div class="steps-list">
+            <div class="step-item">
+                <div class="step-num">1</div>
+                <div class="step-text">
+                    <strong>Check DNS propagation</strong> — Use
+                    <a href="https://dnschecker.org" target="_blank" rel="noopener" class="link">dnschecker.org</a>
+                    or run: <code class="inline-code">dig MX {{.Domain}}</code>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">2</div>
+                <div class="step-text">
+                    <strong>Test email deliverability</strong> — Send a test email to
+                    <a href="https://mail-tester.com" target="_blank" rel="noopener" class="link">mail-tester.com</a>
+                    to check your score.
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">3</div>
+                <div class="step-text">
+                    <strong>Verify DKIM</strong> — Run:
+                    <code class="inline-code">dig TXT mail._domainkey.{{.Domain}}</code>
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">4</div>
+                <div class="step-text">
+                    <strong>Check SPF</strong> — Run:
+                    <code class="inline-code">dig TXT {{.Domain}}</code>
+                    and look for the <code class="inline-code">v=spf1</code> record.
+                </div>
+            </div>
+            <div class="step-item">
+                <div class="step-num">5</div>
+                <div class="step-text">
+                    <strong>Check PTR (rDNS)</strong> — Ask your hosting provider to set a reverse DNS record
+                    pointing your server IP to <code class="inline-code">{{.MailHost}}</code>.
+                    This is critical for avoiding spam classification.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Copy notification -->
+<div class="copy-toast" id="copyToast">Copied!</div>
+{{end}}
