@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # ============================================================
 # Mail Server Installer
@@ -197,12 +197,17 @@ success "Project files copied to /opt/mailserver"
 step "Building web UI"
 cd /opt/mailserver/web
 
-# Download dependencies
 export GOPATH=/root/go
 export GOCACHE=/root/.cache/go-build
-go mod download 2>&1 | while IFS= read -r line; do info "$line"; done
 
-go build -o /usr/local/bin/mailserver-web . 2>&1 | while IFS= read -r line; do info "$line"; done
+info "Downloading Go dependencies..."
+go mod download
+
+info "Compiling web UI..."
+if ! go build -o /usr/local/bin/mailserver-web .; then
+    error "Go build failed. Run: cd /opt/mailserver/web && go build -o /usr/local/bin/mailserver-web . for details."
+fi
+chmod +x /usr/local/bin/mailserver-web
 success "Web UI binary built: /usr/local/bin/mailserver-web"
 
 # --- Hash admin password ---
