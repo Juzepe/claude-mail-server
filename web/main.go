@@ -57,7 +57,7 @@ func main() {
 	}
 	defer db.Close()
 
-	log.Printf("Starting mailserver web UI for domain: %s", cfg.Domain)
+	log.Printf("Starting mailserver web UI at https://%s", cfg.Hostname)
 
 	mux := http.NewServeMux()
 
@@ -86,7 +86,7 @@ func main() {
 	// HTTP -> HTTPS redirect + ACME challenge handler
 	certManager := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(cfg.Domain, "mail."+cfg.Domain),
+		HostPolicy: autocert.HostWhitelist(cfg.Hostname),
 		Cache:      autocert.DirCache(cfg.DataDir + "/certs"),
 		Email:      cfg.AdminEmail,
 	}

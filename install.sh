@@ -228,6 +228,7 @@ success "Admin password hashed."
 step "Writing config"
 cat > /etc/mailserver/config.env << EOF
 DOMAIN=${DOMAIN}
+HOSTNAME=${MAIL_HOSTNAME}
 ADMIN_EMAIL=${ADMIN_EMAIL}
 ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
 DATA_DIR=/var/lib/mailserver
@@ -334,28 +335,17 @@ else
 
     certbot certonly \
         --standalone \
-        -d "${DOMAIN}" \
         -d "${MAIL_HOSTNAME}" \
         --agree-tos \
         --email "${ADMIN_EMAIL}" \
         --non-interactive \
         2>&1 | while IFS= read -r line; do info "$line"; done || {
-            warn "certbot failed for both domains, trying with just ${DOMAIN}..."
-            certbot certonly \
-                --standalone \
-                -d "${DOMAIN}" \
-                --agree-tos \
-                --email "${ADMIN_EMAIL}" \
-                --non-interactive
+            warn "certbot failed - ensure an A record for ${MAIL_HOSTNAME} points to this server."
         }
 fi
 
-# Symlink for easier access
-CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
-if [[ ! -f "$CERT_DIR/fullchain.pem" ]]; then
-    # Try mail.domain cert
-    CERT_DIR="/etc/letsencrypt/live/${MAIL_HOSTNAME}"
-fi
+# Cert is always requested for mail.domain
+CERT_DIR="/etc/letsencrypt/live/${MAIL_HOSTNAME}"
 
 if [[ -f "$CERT_DIR/fullchain.pem" ]]; then
     success "SSL certificate obtained: $CERT_DIR"
@@ -437,7 +427,7 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║              INSTALLATION COMPLETE!                             ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}"
 echo
-echo -e "${WHITE}Web UI:${NC} https://${DOMAIN}"
+echo -e "${WHITE}Web UI:${NC} https://${MAIL_HOSTNAME}"
 echo -e "${WHITE}Login:${NC}  ${ADMIN_EMAIL} / (your password)"
 echo
 echo -e "${YELLOW}=== DNS Records to configure ===${NC}"
@@ -455,7 +445,7 @@ echo -e "SMTP Port:        587 (STARTTLS)"
 echo -e "IMAP Host:        ${MAIL_HOSTNAME} (or ${DOMAIN})"
 echo -e "IMAP Port:        993 (SSL/TLS)"
 echo
-echo -e "${CYAN}Manage email accounts at: https://${DOMAIN}${NC}"
+echo -e "${CYAN}Manage email accounts at: https://${MAIL_HOSTNAME}${NC}"
 echo -e "${CYAN}Config file: /etc/mailserver/config.env${NC}"
 echo
 echo -e "${YELLOW}NOTE:${NC} Set DNS records above BEFORE sending/receiving mail."

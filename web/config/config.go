@@ -10,6 +10,7 @@ import (
 // Config holds all runtime configuration for the mail server web UI.
 type Config struct {
 	Domain              string
+	Hostname            string // mail.domain.com — used for web UI and mail server TLS
 	AdminEmail          string
 	AdminPasswordHash   string
 	DataDir             string
@@ -55,6 +56,11 @@ func Load() *Config {
 		log.Fatal("Config error: ADMIN_PASSWORD_HASH is required.")
 	}
 
+	// Derive hostname from domain if not explicitly set
+	if cfg.Hostname == "" {
+		cfg.Hostname = "mail." + cfg.Domain
+	}
+
 	return cfg
 }
 
@@ -90,6 +96,7 @@ func (c *Config) loadFile(path string) error {
 func (c *Config) applyEnv() {
 	envVars := map[string]*string{
 		"DOMAIN":                &c.Domain,
+		"HOSTNAME":              &c.Hostname,
 		"ADMIN_EMAIL":           &c.AdminEmail,
 		"ADMIN_PASSWORD_HASH":   &c.AdminPasswordHash,
 		"DATA_DIR":              &c.DataDir,
@@ -108,6 +115,8 @@ func (c *Config) set(key, value string) {
 	switch key {
 	case "DOMAIN":
 		c.Domain = value
+	case "HOSTNAME":
+		c.Hostname = value
 	case "ADMIN_EMAIL":
 		c.AdminEmail = value
 	case "ADMIN_PASSWORD_HASH":
