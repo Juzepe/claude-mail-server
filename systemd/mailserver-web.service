@@ -22,8 +22,9 @@ WorkingDirectory=/opt/mailserver
 # Security hardening
 NoNewPrivileges=yes
 PrivateTmp=yes
-ProtectSystem=full
+ProtectSystem=strict
 ProtectHome=read-only
+ReadWritePaths=/etc/dovecot /etc/postfix /var/lib/mailserver /var/mail/vhosts
 
 # Restart policy
 Restart=on-failure
