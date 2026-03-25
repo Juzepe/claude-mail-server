@@ -201,7 +201,7 @@ export GOPATH=/root/go
 export GOCACHE=/root/.cache/go-build
 
 info "Downloading Go dependencies..."
-go mod download
+go mod tidy
 
 info "Compiling web UI..."
 if ! go build -o /usr/local/bin/mailserver-web .; then

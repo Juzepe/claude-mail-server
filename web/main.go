@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/bcrypt"
+	"golang.org/x/crypto/bcrypt"
 	"flag"
 	"fmt"
 	"log"

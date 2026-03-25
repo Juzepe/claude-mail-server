@@ -10,7 +10,6 @@ web/mailserver-web
 
 # Go module cache
 /vendor/
-go.sum
 
 # IDE and editor files
 .vscode/
