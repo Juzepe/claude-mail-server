@@ -193,6 +193,27 @@ if [[ "$SCRIPT_DIR" != "/opt/mailserver" ]]; then
 fi
 success "Project files copied to /opt/mailserver"
 
+# --- Ensure enough memory for Go build ---
+step "Checking available memory"
+TOTAL_RAM=$(free -m | awk '/^Mem:/{print $2}')
+if [[ $TOTAL_RAM -lt 1024 ]]; then
+    if swapon --show | grep -q /swapfile 2>/dev/null; then
+        info "Swap already active."
+    elif [[ -f /swapfile ]]; then
+        swapon /swapfile
+        info "Activated existing swap file."
+    else
+        info "Low RAM detected (${TOTAL_RAM}MB). Creating 1GB swap file..."
+        fallocate -l 1G /swapfile
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        # Persist across reboots
+        grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+        success "Swap file created and activated."
+    fi
+fi
+
 # --- Build Go web UI ---
 step "Building web UI"
 cd /opt/mailserver/web
