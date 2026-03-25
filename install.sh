@@ -327,11 +327,11 @@ success "OpenDKIM configured."
 step "Obtaining SSL certificate"
 
 # Check if cert already exists
-if [[ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]]; then
-    warn "Certificate for ${DOMAIN} already exists, skipping certbot."
+if [[ -f "/etc/letsencrypt/live/${MAIL_HOSTNAME}/fullchain.pem" ]]; then
+    warn "Certificate for ${MAIL_HOSTNAME} already exists, skipping certbot."
 else
-    # Stop any service on port 80 temporarily
-    systemctl stop apache2 nginx 2>/dev/null || true
+    # Stop and disable any service that might occupy ports 80/443
+    systemctl disable --now apache2 nginx 2>/dev/null || true
 
     certbot certonly \
         --standalone \
