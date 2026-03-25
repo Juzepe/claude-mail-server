@@ -1,0 +1,94 @@
+{{define "title"}}Compose — {{.Domain}}{{end}}
+{{define "nav_compose"}}active{{end}}
+{{define "page_title"}}Compose{{end}}
+
+{{define "content"}}
+{{if .Flash}}
+<div class="alert alert-success flash-banner" id="flashMsg">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>
+    {{.Flash}}
+</div>
+{{end}}
+
+{{if .Error}}
+<div class="alert alert-error flash-banner" id="flashMsg">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    {{.Error}}
+</div>
+{{end}}
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            New Message
+        </h2>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="/portal/compose" class="compose-form">
+            <div class="form-group">
+                <label class="form-label">From</label>
+                <input type="text" class="form-input" value="{{.Email}}" disabled>
+            </div>
+
+            <div class="form-group">
+                <label for="to" class="form-label">To</label>
+                <input
+                    type="email"
+                    id="to"
+                    name="to"
+                    class="form-input"
+                    value="{{.To}}"
+                    placeholder="recipient@example.com"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="subject" class="form-label">Subject</label>
+                <input
+                    type="text"
+                    id="subject"
+                    name="subject"
+                    class="form-input"
+                    value="{{.Subject}}"
+                    placeholder="Email subject"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="body" class="form-label">Message</label>
+                <textarea
+                    id="body"
+                    name="body"
+                    class="form-input"
+                    rows="10"
+                    placeholder="Write your message here..."
+                >{{.Body}}</textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"/>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
+                    Send Email
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}}

@@ -83,6 +83,11 @@ func main() {
 	mux.Handle("/credentials", auth(handlers.Credentials(cfg)))
 	mux.Handle("/dns", auth(handlers.DNS(cfg)))
 
+	// User portal
+	mux.HandleFunc("/portal/login", handlers.PortalLogin(cfg))
+	mux.HandleFunc("/portal/logout", handlers.PortalLogout(cfg))
+	mux.HandleFunc("/portal/", handlers.PortalHandler(cfg))
+
 	// HTTP -> HTTPS redirect + ACME challenge handler
 	certManager := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
