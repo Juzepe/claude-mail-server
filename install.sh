@@ -376,8 +376,8 @@ CERT_DIR="/etc/letsencrypt/live/${MAIL_HOSTNAME}"
 if [[ -f "$CERT_DIR/fullchain.pem" ]]; then
     success "SSL certificate obtained: $CERT_DIR"
 else
-    warn "SSL certificate not found. You will need to configure TLS manually."
-    CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
+    warn "SSL certificate not found at $CERT_DIR."
+    warn "Ensure the A record for ${MAIL_HOSTNAME} points to this server, then run: certbot certonly --standalone -d ${MAIL_HOSTNAME}"
 fi
 
 # Update postfix/dovecot with correct cert path if needed
