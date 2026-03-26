@@ -112,6 +112,7 @@ apt-get install -y -q \
     ca-certificates \
     openssl \
     mailutils \
+    dnsutils \
     2>/dev/null || true
 
 success "Packages installed."
@@ -352,37 +353,44 @@ success "OpenDKIM configured."
 # --- SSL Certificate ---
 step "Obtaining SSL certificate"
 
-# Check if cert already exists
-if [[ -f "/etc/letsencrypt/live/${MAIL_HOSTNAME}/fullchain.pem" ]]; then
-    warn "Certificate for ${MAIL_HOSTNAME} already exists, skipping certbot."
+CERT_DIR="/etc/letsencrypt/live/${MAIL_HOSTNAME}"
+
+if [[ -f "${CERT_DIR}/fullchain.pem" ]]; then
+    success "Certificate for ${MAIL_HOSTNAME} already exists, skipping certbot."
 else
-    # Stop and disable any service that might occupy ports 80/443
+    # Verify DNS resolves to this server before attempting certbot
+    SERVER_IP=$(curl -s4 --max-time 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+    DNS_IP=$(dig +short "${MAIL_HOSTNAME}" 2>/dev/null | tail -1)
+
+    info "Server IP:  ${SERVER_IP}"
+    info "DNS IP:     ${DNS_IP:-not found}"
+
+    if [[ -z "$DNS_IP" ]]; then
+        error "DNS A record for ${MAIL_HOSTNAME} not found. Add an A record pointing to ${SERVER_IP} and re-run the installer."
+    fi
+
+    if [[ "$DNS_IP" != "$SERVER_IP" ]]; then
+        error "DNS A record for ${MAIL_HOSTNAME} points to ${DNS_IP}, but this server's IP is ${SERVER_IP}. Fix the A record and re-run the installer."
+    fi
+
+    # Stop any service that might occupy port 80
     systemctl disable --now apache2 nginx 2>/dev/null || true
 
-    certbot certonly \
+    if ! certbot certonly \
         --standalone \
         -d "${MAIL_HOSTNAME}" \
         --agree-tos \
         --email "${ADMIN_EMAIL}" \
-        --non-interactive \
-        2>&1 | while IFS= read -r line; do info "$line"; done || {
-            warn "certbot failed - ensure an A record for ${MAIL_HOSTNAME} points to this server."
-        }
+        --non-interactive; then
+        error "certbot failed to obtain a certificate for ${MAIL_HOSTNAME}. Check that port 80 is open and DNS is correct."
+    fi
+
+    success "SSL certificate obtained: ${CERT_DIR}"
 fi
 
-# Cert is always requested for mail.domain
-CERT_DIR="/etc/letsencrypt/live/${MAIL_HOSTNAME}"
-
-if [[ -f "$CERT_DIR/fullchain.pem" ]]; then
-    success "SSL certificate obtained: $CERT_DIR"
-else
-    warn "SSL certificate not found at $CERT_DIR."
-    warn "Ensure the A record for ${MAIL_HOSTNAME} points to this server, then run: certbot certonly --standalone -d ${MAIL_HOSTNAME}"
-fi
-
-# Update postfix/dovecot with correct cert path if needed
-sed -i "s|{{CERT_DIR}}|${CERT_DIR}|g" /etc/postfix/main.cf 2>/dev/null || true
-sed -i "s|{{CERT_DIR}}|${CERT_DIR}|g" /etc/dovecot/dovecot.conf 2>/dev/null || true
+# Write cert paths into postfix and dovecot configs
+sed -i "s|{{CERT_DIR}}|${CERT_DIR}|g" /etc/postfix/main.cf
+sed -i "s|{{CERT_DIR}}|${CERT_DIR}|g" /etc/dovecot/dovecot.conf
 
 # --- Install systemd service ---
 step "Installing systemd service"
