@@ -375,6 +375,7 @@ else
 
     # Stop any service that might occupy port 80
     systemctl disable --now apache2 nginx 2>/dev/null || true
+    systemctl stop mailserver-web 2>/dev/null || true
 
     if ! certbot certonly \
         --standalone \
