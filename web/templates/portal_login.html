@@ -33,7 +33,7 @@
             </div>
             {{end}}
 
-            <form method="POST" action="/portal/login" class="login-form">
+            <form method="POST" action="/login" class="login-form">
                 <div class="form-group">
                     <label for="email" class="form-label">Email Address</label>
                     <input
@@ -77,7 +77,7 @@
             </form>
 
             <p class="login-footer">
-                <a href="/login" class="link">Admin panel &rarr;</a>
+                <a href="https://mail.{{.Domain}}/login" class="link">Admin panel &rarr;</a>
             </p>
         </div>
     </div>

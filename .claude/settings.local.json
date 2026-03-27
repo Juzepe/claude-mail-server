@@ -7,7 +7,29 @@
       "Bash(gh --version)",
       "Bash(pip install:*)",
       "Bash(snap install:*)",
-      "Bash(echo \"snap exit: $?\")"
+      "Bash(echo \"snap exit: $?\")",
+      "Bash(go mod:*)",
+      "Read(//usr/local/go/bin/**)",
+      "Read(//home/juzepe/go/bin/**)",
+      "Bash(grep -v \".go$\")",
+      "Bash(snap list:*)",
+      "Bash(apt list:*)",
+      "Bash(wget -q https://go.dev/dl/go1.21.6.linux-amd64.tar.gz -O /tmp/go.tar.gz)",
+      "Bash(sudo tar:*)",
+      "Bash(rm /tmp/go.tar.gz)",
+      "Bash(tar -C /tmp -xzf /tmp/go.tar.gz)",
+      "Bash(/tmp/go/bin/go mod:*)",
+      "Bash(/tmp/go/bin/go build:*)",
+      "Bash(rm /tmp/mailserver-web-test)",
+      "Bash(go build:*)",
+      "Read(//snap/go/current/**)",
+      "Bash(find / -maxdepth 6 -name go -type f)",
+      "Bash(/tmp/go/bin/go vet:*)",
+      "Bash(sed -i 's|\\\\t\\\\t\\\\t\\\\tPath:     \"\"/portal/\"\",|\\\\t\\\\t\\\\t\\\\tPath:     \"\"/\"\",|g' \"/home/juzepe/Projects/claude/mail server/web/handlers/portal.go\")",
+      "Bash(sed -i 's|http.Redirect\\(w, r, \"\"/portal/\"\", http.StatusSeeOther\\)|http.Redirect\\(w, r, \"\"/\"\", http.StatusSeeOther\\)|g' \"/home/juzepe/Projects/claude/mail server/web/handlers/portal.go\")",
+      "Bash(go version:*)",
+      "Bash(grep \"bin/go$\")",
+      "Bash(/tmp/go/bin/go version:*)"
     ]
   }
 }

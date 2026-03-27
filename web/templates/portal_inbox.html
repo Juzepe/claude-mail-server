@@ -20,7 +20,7 @@
         <div class="folder-tabs">
             {{$currentFolder := .Folder}}
             {{range .Folders}}
-            <a href="/portal/inbox?folder={{.}}"
+            <a href="/inbox?folder={{.}}"
                class="folder-tab {{if eq . $currentFolder}}active{{end}}">
                 {{.}}
             </a>
@@ -45,7 +45,7 @@
             {{if .Emails}}
             <div class="email-list">
                 {{range .Emails}}
-                <a href="/portal/inbox?folder={{$.Folder}}&uid={{.UID}}"
+                <a href="/inbox?folder={{$.Folder}}&uid={{.UID}}"
                    class="email-item {{if not .Seen}}email-unread{{end}} {{if and $.SelectedEmail (eq $.SelectedEmail.UID .UID)}}email-selected{{end}}">
                     <div class="email-sender">{{.From}}</div>
                     <div class="email-subject">{{if .Subject}}{{.Subject}}{{else}}(no subject){{end}}</div>

@@ -256,6 +256,7 @@ step "Writing config"
 cat > /etc/mailserver/config.env << EOF
 DOMAIN=${DOMAIN}
 HOSTNAME=${MAIL_HOSTNAME}
+PORTAL_HOSTNAME=portal.${DOMAIN}
 ADMIN_EMAIL=${ADMIN_EMAIL}
 ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
 DATA_DIR=/var/lib/mailserver
@@ -462,14 +463,16 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║              INSTALLATION COMPLETE!                             ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}"
 echo
-echo -e "${WHITE}Web UI:${NC} https://${MAIL_HOSTNAME}"
-echo -e "${WHITE}Login:${NC}  ${ADMIN_EMAIL} / (your password)"
+echo -e "${WHITE}Web UI:${NC}  https://${MAIL_HOSTNAME}"
+echo -e "${WHITE}Portal:${NC}  https://portal.${DOMAIN}"
+echo -e "${WHITE}Login:${NC}   ${ADMIN_EMAIL} / (your password)"
 echo
 echo -e "${YELLOW}=== DNS Records to configure ===${NC}"
 echo -e "${WHITE}Type  Name                   Value${NC}"
 echo -e "────  ─────────────────────  ─────────────────────────────────"
 echo -e "MX    @                      ${MAIL_HOSTNAME} (priority 10)"
 echo -e "A     mail                   $(curl -s4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+echo -e "A     portal                 $(curl -s4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
 echo -e "TXT   @                      v=spf1 mx a:${MAIL_HOSTNAME} ~all"
 echo -e "TXT   mail._domainkey        v=DKIM1; k=rsa; p=${DKIM_PUBLIC}"
 echo -e "TXT   _dmarc                 v=DMARC1; p=quarantine; rua=mailto:postmaster@${DOMAIN}"

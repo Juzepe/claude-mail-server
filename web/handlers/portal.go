@@ -334,12 +334,12 @@ func renderPortalTemplate(w http.ResponseWriter, name string, data interface{}) 
 
 // ---- Route handlers --------------------------------------------------------
 
-// PortalLogin handles GET /portal/login (show form) and POST /portal/login (authenticate).
+// PortalLogin handles GET /login (show form) and POST /login (authenticate).
 func PortalLogin(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// If already logged in, redirect to inbox
 		if sess := getPortalSession(r); sess != nil {
-			http.Redirect(w, r, "/portal/", http.StatusSeeOther)
+			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
 
@@ -372,7 +372,7 @@ func PortalLogin(cfg *config.Config) http.HandlerFunc {
 			http.SetCookie(w, &http.Cookie{
 				Name:     portalSessionCookieName,
 				Value:    token,
-				Path:     "/portal/",
+				Path:     "/",
 				Expires:  time.Now().Add(24 * time.Hour),
 				HttpOnly: true,
 				Secure:   r.TLS != nil,
@@ -380,7 +380,7 @@ func PortalLogin(cfg *config.Config) http.HandlerFunc {
 			})
 
 			log.Printf("Portal: successful login for %s from %s", email, getIP(r))
-			http.Redirect(w, r, "/portal/", http.StatusSeeOther)
+			http.Redirect(w, r, "/", http.StatusSeeOther)
 
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -397,32 +397,32 @@ func PortalLogout(cfg *config.Config) http.HandlerFunc {
 		http.SetCookie(w, &http.Cookie{
 			Name:     portalSessionCookieName,
 			Value:    "",
-			Path:     "/portal/",
+			Path:     "/",
 			Expires:  time.Unix(0, 0),
 			MaxAge:   -1,
 			HttpOnly: true,
 			Secure:   r.TLS != nil,
 		})
-		http.Redirect(w, r, "/portal/login", http.StatusSeeOther)
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	}
 }
 
-// PortalHandler handles all authenticated portal routes under /portal/.
+// PortalHandler handles all authenticated portal routes at the root of the portal subdomain.
 func PortalHandler(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess := getPortalSession(r)
 		if sess == nil {
-			http.Redirect(w, r, "/portal/login", http.StatusSeeOther)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
 		path := r.URL.Path
 		switch {
-		case path == "/portal/" || path == "/portal/inbox":
+		case path == "/" || path == "/inbox":
 			portalInbox(w, r, cfg, sess)
-		case path == "/portal/compose":
+		case path == "/compose":
 			portalCompose(w, r, cfg, sess)
-		case path == "/portal/credentials":
+		case path == "/credentials":
 			portalCredentials(w, r, cfg, sess)
 		default:
 			http.NotFound(w, r)

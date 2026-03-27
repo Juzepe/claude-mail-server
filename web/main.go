@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"mailserver/config"
@@ -58,40 +59,54 @@ func main() {
 	defer db.Close()
 
 	log.Printf("Starting mailserver web UI at https://%s", cfg.Hostname)
+	log.Printf("User portal at https://%s", cfg.PortalHostname)
 
-	mux := http.NewServeMux()
-
-	// Static files
+	// Static files directory
 	staticDir := "/opt/mailserver/web/static"
 	if _, err := os.Stat(staticDir); os.IsNotExist(err) {
 		// Fallback to local directory for development
 		staticDir = "./static"
 	}
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
 
-	// Public routes
-	mux.HandleFunc("/login", handlers.Login(cfg))
-	mux.HandleFunc("/logout", handlers.Logout(cfg))
-
-	// Protected routes
+	// Admin mux — existing admin panel routes
+	adminMux := http.NewServeMux()
+	adminMux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+	adminMux.HandleFunc("/login", handlers.Login(cfg))
+	adminMux.HandleFunc("/logout", handlers.Logout(cfg))
 	auth := middleware.RequireAuth(cfg)
-	mux.Handle("/", auth(handlers.Dashboard(cfg)))
-	mux.Handle("/users", auth(handlers.Users(cfg)))
-	mux.Handle("/users/add", auth(handlers.UsersAdd(cfg)))
-	mux.Handle("/users/delete", auth(handlers.UsersDelete(cfg)))
-	mux.Handle("/emails", auth(handlers.Emails(cfg)))
-	mux.Handle("/credentials", auth(handlers.Credentials(cfg)))
-	mux.Handle("/dns", auth(handlers.DNS(cfg)))
+	adminMux.Handle("/", auth(handlers.Dashboard(cfg)))
+	adminMux.Handle("/users", auth(handlers.Users(cfg)))
+	adminMux.Handle("/users/add", auth(handlers.UsersAdd(cfg)))
+	adminMux.Handle("/users/delete", auth(handlers.UsersDelete(cfg)))
+	adminMux.Handle("/emails", auth(handlers.Emails(cfg)))
+	adminMux.Handle("/credentials", auth(handlers.Credentials(cfg)))
+	adminMux.Handle("/dns", auth(handlers.DNS(cfg)))
 
-	// User portal
-	mux.HandleFunc("/portal/login", handlers.PortalLogin(cfg))
-	mux.HandleFunc("/portal/logout", handlers.PortalLogout(cfg))
-	mux.HandleFunc("/portal/", handlers.PortalHandler(cfg))
+	// Portal mux — user webmail routes (no /portal/ prefix)
+	portalMux := http.NewServeMux()
+	portalMux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+	portalMux.HandleFunc("/login", handlers.PortalLogin(cfg))
+	portalMux.HandleFunc("/logout", handlers.PortalLogout(cfg))
+	portalMux.HandleFunc("/", handlers.PortalHandler(cfg))
+
+	// Top-level router: dispatch by Host header
+	portalHost := cfg.PortalHostname
+	router := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		if i := strings.LastIndex(host, ":"); i != -1 {
+			host = host[:i]
+		}
+		if host == portalHost {
+			portalMux.ServeHTTP(w, r)
+		} else {
+			adminMux.ServeHTTP(w, r)
+		}
+	})
 
 	// HTTP -> HTTPS redirect + ACME challenge handler
 	certManager := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(cfg.Hostname),
+		HostPolicy: autocert.HostWhitelist(cfg.Hostname, cfg.PortalHostname),
 		Cache:      autocert.DirCache(cfg.DataDir + "/certs"),
 		Email:      cfg.AdminEmail,
 	}
@@ -106,7 +121,7 @@ func main() {
 
 	httpsServer := &http.Server{
 		Addr:         ":443",
-		Handler:      mux,
+		Handler:      router,
 		TLSConfig:    certManager.TLSConfig(),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 30 * time.Second,
