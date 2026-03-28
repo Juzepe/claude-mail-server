@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"html/template"
@@ -220,11 +221,12 @@ func fetchBodyForUser(email, password, folder string, uid uint32) (string, error
 // ---- SMTP send helper ------------------------------------------------------
 
 // sendEmailViaLocalSMTP dials localhost:587, does STARTTLS (InsecureSkipVerify),
-// authenticates with PlainAuth, and sends the message.
-func sendEmailViaLocalSMTP(from, password, to, subject, body string) error {
+// authenticates with PlainAuth, and sends the message. Returns the raw RFC 2822
+// message bytes so the caller can save a copy to the Sent folder.
+func sendEmailViaLocalSMTP(from, password, to, subject, body string) ([]byte, error) {
 	c, err := smtp.Dial("localhost:587")
 	if err != nil {
-		return fmt.Errorf("SMTP dial failed: %w", err)
+		return nil, fmt.Errorf("SMTP dial failed: %w", err)
 	}
 	defer c.Close()
 
@@ -234,40 +236,71 @@ func sendEmailViaLocalSMTP(from, password, to, subject, body string) error {
 		ServerName:         "localhost",
 	}
 	if err := c.StartTLS(tlsCfg); err != nil {
-		return fmt.Errorf("STARTTLS failed: %w", err)
+		return nil, fmt.Errorf("STARTTLS failed: %w", err)
 	}
 
 	// Authenticate
 	auth := smtp.PlainAuth("", from, password, "localhost")
 	if err := c.Auth(auth); err != nil {
-		return fmt.Errorf("SMTP auth failed: %w", err)
+		return nil, fmt.Errorf("SMTP auth failed: %w", err)
 	}
 
 	// Envelope
 	if err := c.Mail(from); err != nil {
-		return fmt.Errorf("SMTP MAIL FROM failed: %w", err)
+		return nil, fmt.Errorf("SMTP MAIL FROM failed: %w", err)
 	}
 	if err := c.Rcpt(to); err != nil {
-		return fmt.Errorf("SMTP RCPT TO failed: %w", err)
+		return nil, fmt.Errorf("SMTP RCPT TO failed: %w", err)
 	}
 
 	// Message data
 	wc, err := c.Data()
 	if err != nil {
-		return fmt.Errorf("SMTP DATA failed: %w", err)
+		return nil, fmt.Errorf("SMTP DATA failed: %w", err)
 	}
 
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
-		from, to, subject, body)
-	if _, err := fmt.Fprint(wc, msg); err != nil {
+	rawMsg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
+		from, to, subject, time.Now().Format("Mon, 02 Jan 2006 15:04:05 -0700"), body))
+	if _, err := wc.Write(rawMsg); err != nil {
 		wc.Close()
-		return fmt.Errorf("SMTP write failed: %w", err)
+		return nil, fmt.Errorf("SMTP write failed: %w", err)
 	}
 	if err := wc.Close(); err != nil {
-		return fmt.Errorf("SMTP data close failed: %w", err)
+		return nil, fmt.Errorf("SMTP data close failed: %w", err)
 	}
 
-	return c.Quit()
+	return rawMsg, c.Quit()
+}
+
+// appendToSent saves a copy of the message to the user's Sent folder via IMAP APPEND.
+// It creates the Sent mailbox first if it does not exist.
+func appendToSent(email, password string, rawMsg []byte) {
+	c, err := client.Dial("localhost:143")
+	if err != nil {
+		log.Printf("Portal: IMAP dial for Sent append failed: %v", err)
+		return
+	}
+	defer c.Logout()
+
+	if err := c.Login(email, password); err != nil {
+		log.Printf("Portal: IMAP login for Sent append failed: %v", err)
+		return
+	}
+
+	// Ensure Sent mailbox exists
+	if err := c.Create("Sent"); err != nil {
+		// Ignore "already exists" errors
+		if !strings.Contains(err.Error(), "exist") {
+			log.Printf("Portal: IMAP Create Sent failed: %v", err)
+		}
+	}
+
+	flags := []string{goimap.SeenFlag}
+	if err := c.Append("Sent", flags, time.Now(), bytes.NewReader(rawMsg)); err != nil {
+		log.Printf("Portal: IMAP Append to Sent failed: %v", err)
+	} else {
+		log.Printf("Portal: saved sent email to Sent folder for %s", email)
+	}
 }
 
 // ---- Template rendering helpers --------------------------------------------
@@ -532,12 +565,14 @@ func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 			return
 		}
 
-		if err := sendEmailViaLocalSMTP(sess.Email, sess.Password, to, subject, body); err != nil {
+		rawMsg, err := sendEmailViaLocalSMTP(sess.Email, sess.Password, to, subject, body)
+		if err != nil {
 			log.Printf("Portal: send email error for %s: %v", sess.Email, err)
 			data.Error = fmt.Sprintf("Failed to send email: %v", err)
 			renderPortalTemplate(w, "portal_compose.html", data)
 			return
 		}
+		go appendToSent(sess.Email, sess.Password, rawMsg)
 
 		// Success — clear fields and show flash
 		data.To = ""
