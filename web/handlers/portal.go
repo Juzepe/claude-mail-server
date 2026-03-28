@@ -570,13 +570,14 @@ func portalInbox(w http.ResponseWriter, r *http.Request, cfg *config.Config, ses
 }
 
 type portalComposeData struct {
-	Domain  string
-	Email   string
-	Error   string
-	Flash   string
-	To      string
-	Subject string
-	Body    string
+	Domain     string
+	Email      string
+	Error      string
+	Flash      string
+	To         string
+	Subject    string
+	Body       string
+	QuotedBody string // read-only original message shown below textarea
 }
 
 func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
@@ -596,12 +597,18 @@ func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 		to := strings.TrimSpace(r.FormValue("to"))
 		subject := strings.TrimSpace(r.FormValue("subject"))
 		body := r.FormValue("body")
+		quotedBody := r.FormValue("quoted_body")
 
 		log.Printf("Portal: compose sending from=%s to=%s subject=%q", sess.Email, to, subject)
 
 		data.To = to
 		data.Subject = subject
 		data.Body = body
+		data.QuotedBody = quotedBody
+
+		if quotedBody != "" {
+			body = body + "\n\n" + quotedBody
+		}
 
 		if to == "" {
 			data.Error = "Recipient (To) is required."
@@ -676,15 +683,12 @@ func portalReply(w http.ResponseWriter, r *http.Request, cfg *config.Config, ses
 		replySubject = "Re: " + replySubject
 	}
 
-	// Quote original body
-	quoted := quoteBody(original.From, original.Date, body)
-
 	data := portalComposeData{
-		Domain:  cfg.Domain,
-		Email:   sess.Email,
-		To:      replyTo,
-		Subject: replySubject,
-		Body:    quoted,
+		Domain:     cfg.Domain,
+		Email:      sess.Email,
+		To:         replyTo,
+		Subject:    replySubject,
+		QuotedBody: quoteBody(original.From, original.Date, body),
 	}
 	renderPortalTemplate(w, "portal_compose.html", data)
 }

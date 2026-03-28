@@ -74,10 +74,18 @@
                     id="body"
                     name="body"
                     class="form-input"
-                    rows="10"
+                    rows="{{if .QuotedBody}}6{{else}}10{{end}}"
                     placeholder="Write your message here..."
                 >{{.Body}}</textarea>
             </div>
+
+            {{if .QuotedBody}}
+            <input type="hidden" name="quoted_body" value="{{.QuotedBody}}">
+            <div class="form-group">
+                <label class="form-label">Original Message</label>
+                <pre class="quoted-message">{{.QuotedBody}}</pre>
+            </div>
+            {{end}}
 
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">

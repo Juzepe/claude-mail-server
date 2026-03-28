@@ -806,6 +806,17 @@ code.dns-value {
     min-width: 60px;
 }
 .email-body { margin-top: 16px; }
+.quoted-message {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    background: var(--bg-secondary);
+    border-left: 3px solid var(--border);
+    padding: 12px 16px;
+    border-radius: 0 4px 4px 0;
+    margin: 0;
+}
 .email-body-text {
     font-family: var(--font-mono);
     font-size: 0.8rem;
