@@ -706,18 +706,37 @@ func extractEmailAddress(from string) string {
 // quoteBody formats the original message as a reply quote.
 func quoteBody(from string, date time.Time, body string) string {
 	var sb strings.Builder
-	sb.WriteString("\n\n")
 	sb.WriteString("On ")
 	sb.WriteString(date.Format("Mon, Jan 2, 2006 at 15:04"))
 	sb.WriteString(", ")
 	sb.WriteString(from)
-	sb.WriteString(" wrote:\n")
-	for _, line := range strings.Split(strings.TrimRight(body, "\n"), "\n") {
-		sb.WriteString("> ")
-		sb.WriteString(line)
-		sb.WriteString("\n")
-	}
+	sb.WriteString(" wrote:\n\n")
+	sb.WriteString(stripReplyChain(body))
 	return sb.String()
+}
+
+// stripReplyChain removes nested quoted content, signatures, and reply headers
+// so only the direct message text is shown.
+func stripReplyChain(body string) string {
+	lines := strings.Split(body, "\n")
+	var result []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Stop at nested quote lines
+		if strings.HasPrefix(trimmed, ">") {
+			break
+		}
+		// Stop at email signature marker
+		if trimmed == "--" || trimmed == "-- " {
+			break
+		}
+		// Stop at "On DATE, PERSON wrote:" reply chain header
+		if strings.HasPrefix(trimmed, "On ") && strings.Contains(trimmed, " wrote:") {
+			break
+		}
+		result = append(result, line)
+	}
+	return strings.TrimSpace(strings.Join(result, "\n"))
 }
 
 type portalCredentialsData struct {
