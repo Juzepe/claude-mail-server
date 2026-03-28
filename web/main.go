@@ -96,6 +96,7 @@ func main() {
 		if i := strings.LastIndex(host, ":"); i != -1 {
 			host = host[:i]
 		}
+		log.Printf("Router: %s %s host=%q portalHost=%q", r.Method, r.URL.Path, host, portalHost)
 		if host == portalHost {
 			portalMux.ServeHTTP(w, r)
 		} else {
