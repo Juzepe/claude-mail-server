@@ -7,7 +7,11 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"mime"
+	"mime/multipart"
+	"mime/quotedprintable"
 	"net/http"
+	"net/mail"
 	"net/smtp"
 	"path/filepath"
 	"strconv"
@@ -202,13 +206,7 @@ func fetchBodyForUser(email, password, folder string, uid uint32) (string, error
 		log.Printf("Portal: uid fetch warning: %v", err)
 	}
 
-	// Extract text/plain part (simple extraction)
-	if strings.Contains(bodyStr, "Content-Type: text/plain") {
-		parts := strings.SplitN(bodyStr, "\r\n\r\n", 2)
-		if len(parts) == 2 {
-			bodyStr = parts[1]
-		}
-	}
+	bodyStr = extractPlainText(bodyStr)
 
 	const maxBodyLen = 50000
 	if len(bodyStr) > maxBodyLen {
@@ -216,6 +214,52 @@ func fetchBodyForUser(email, password, folder string, uid uint32) (string, error
 	}
 
 	return bodyStr, nil
+}
+
+// extractPlainText parses a raw RFC 2822 message and returns the text/plain
+// body, decoding quoted-printable and handling multipart messages.
+func extractPlainText(raw string) string {
+	msg, err := mail.ReadMessage(strings.NewReader(raw))
+	if err != nil {
+		return raw
+	}
+
+	contentType := msg.Header.Get("Content-Type")
+	if contentType == "" {
+		body, _ := io.ReadAll(msg.Body)
+		return string(body)
+	}
+
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		body, _ := io.ReadAll(msg.Body)
+		return string(body)
+	}
+
+	if strings.HasPrefix(mediaType, "multipart/") {
+		mr := multipart.NewReader(msg.Body, params["boundary"])
+		for {
+			part, err := mr.NextPart()
+			if err != nil {
+				break
+			}
+			partMediaType, _, _ := mime.ParseMediaType(part.Header.Get("Content-Type"))
+			if partMediaType == "text/plain" {
+				return decodePart(part, part.Header.Get("Content-Transfer-Encoding"))
+			}
+		}
+		return ""
+	}
+
+	return decodePart(msg.Body, msg.Header.Get("Content-Transfer-Encoding"))
+}
+
+func decodePart(r io.Reader, encoding string) string {
+	if strings.EqualFold(encoding, "quoted-printable") {
+		r = quotedprintable.NewReader(r)
+	}
+	body, _ := io.ReadAll(r)
+	return string(body)
 }
 
 // ---- SMTP send helper ------------------------------------------------------
