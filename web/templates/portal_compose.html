@@ -83,7 +83,9 @@
             <input type="hidden" name="quoted_body" value="{{.QuotedBody}}">
             <div class="form-group">
                 <label class="form-label">Original Message</label>
-                <pre class="quoted-message">{{.QuotedBody}}</pre>
+                <div class="email-body">
+                    <pre class="email-body-text">{{.QuotedBody}}</pre>
+                </div>
             </div>
             {{end}}
 
