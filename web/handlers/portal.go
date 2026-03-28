@@ -539,6 +539,7 @@ func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 		Email:  sess.Email,
 	}
 
+	log.Printf("Portal: compose %s %s", r.Method, sess.Email)
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
 			data.Error = "Failed to parse form."
@@ -549,6 +550,8 @@ func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 		to := strings.TrimSpace(r.FormValue("to"))
 		subject := strings.TrimSpace(r.FormValue("subject"))
 		body := r.FormValue("body")
+
+		log.Printf("Portal: compose sending from=%s to=%s subject=%q", sess.Email, to, subject)
 
 		data.To = to
 		data.Subject = subject
@@ -572,6 +575,7 @@ func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 			renderPortalTemplate(w, "portal_compose.html", data)
 			return
 		}
+		log.Printf("Portal: email sent successfully from %s to %s", sess.Email, to)
 		go appendToSent(sess.Email, sess.Password, rawMsg)
 
 		// Success — clear fields and show flash
