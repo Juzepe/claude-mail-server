@@ -789,7 +789,8 @@ code.dns-value {
     white-space: nowrap;
 }
 
-.email-meta { margin-bottom: 20px; }
+.email-meta { margin-bottom: 12px; }
+.email-actions { margin-bottom: 16px; }
 .email-meta-row {
     display: flex;
     gap: 10px;

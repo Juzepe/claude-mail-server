@@ -499,6 +499,8 @@ func PortalHandler(cfg *config.Config) http.HandlerFunc {
 			portalInbox(w, r, cfg, sess)
 		case path == "/compose":
 			portalCompose(w, r, cfg, sess)
+		case path == "/reply":
+			portalReply(w, r, cfg, sess)
 		case path == "/credentials":
 			portalCredentials(w, r, cfg, sess)
 		default:
@@ -630,6 +632,88 @@ func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 	}
 
 	renderPortalTemplate(w, "portal_compose.html", data)
+}
+
+func portalReply(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
+	q := r.URL.Query()
+	folder := q.Get("folder")
+	if folder == "" {
+		folder = "INBOX"
+	}
+	uidStr := q.Get("uid")
+	uid64, err := strconv.ParseUint(uidStr, 10, 32)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	uid := uint32(uid64)
+
+	// Fetch the original email headers + body
+	emails, _, err := fetchEmailsForUser(sess.Email, sess.Password, folder)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	var original *EmailMessage
+	for i := range emails {
+		if emails[i].UID == uid {
+			original = &emails[i]
+			break
+		}
+	}
+	if original == nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	body, _ := fetchBodyForUser(sess.Email, sess.Password, folder, uid)
+
+	// Build reply fields
+	replyTo := extractEmailAddress(original.From)
+	replySubject := original.Subject
+	if !strings.HasPrefix(strings.ToLower(replySubject), "re:") {
+		replySubject = "Re: " + replySubject
+	}
+
+	// Quote original body
+	quoted := quoteBody(original.From, original.Date, body)
+
+	data := portalComposeData{
+		Domain:  cfg.Domain,
+		Email:   sess.Email,
+		To:      replyTo,
+		Subject: replySubject,
+		Body:    quoted,
+	}
+	renderPortalTemplate(w, "portal_compose.html", data)
+}
+
+// extractEmailAddress pulls the email address out of "Name <email>" or returns the string as-is.
+func extractEmailAddress(from string) string {
+	if start := strings.Index(from, "<"); start != -1 {
+		if end := strings.Index(from, ">"); end > start {
+			return from[start+1 : end]
+		}
+	}
+	return from
+}
+
+// quoteBody formats the original message as a reply quote.
+func quoteBody(from string, date time.Time, body string) string {
+	var sb strings.Builder
+	sb.WriteString("\n\n")
+	sb.WriteString("On ")
+	sb.WriteString(date.Format("Mon, Jan 2, 2006 at 15:04"))
+	sb.WriteString(", ")
+	sb.WriteString(from)
+	sb.WriteString(" wrote:\n")
+	for _, line := range strings.Split(strings.TrimRight(body, "\n"), "\n") {
+		sb.WriteString("> ")
+		sb.WriteString(line)
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 type portalCredentialsData struct {

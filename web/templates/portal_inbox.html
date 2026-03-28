@@ -78,6 +78,15 @@
                     <span>{{.Email}}</span>
                 </div>
             </div>
+            <div class="email-actions">
+                <a href="/reply?uid={{.SelectedEmail.UID}}&folder={{.Folder}}" class="btn btn-secondary btn-sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 17 4 12 9 7"/>
+                        <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+                    </svg>
+                    Reply
+                </a>
+            </div>
             <div class="email-body">
                 <pre class="email-body-text">{{.SelectedEmail.Body}}</pre>
             </div>
