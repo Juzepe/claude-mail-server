@@ -25,6 +25,7 @@ type EmailMessage struct {
 	Subject string
 	Date    time.Time
 	Seen    bool
+	Flagged bool
 	Body    string
 }
 

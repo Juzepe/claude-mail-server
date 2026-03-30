@@ -783,6 +783,9 @@ code.dns-value {
 }
 .email-action-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
 .email-action-delete:hover { color: var(--error); }
+.email-action-star { color: var(--text-muted); }
+.email-action-star:hover { color: var(--warning); }
+.email-action-star-active { color: var(--warning); opacity: 1 !important; }
 .email-item-link {
     flex: 1;
     display: grid;

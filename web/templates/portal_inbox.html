@@ -6,6 +6,7 @@
 {{define "nav_drafts"}}{{if eq .Folder "Drafts"}}active{{end}}{{end}}
 {{define "nav_junk"}}{{if eq .Folder "Junk"}}active{{end}}{{end}}
 {{define "nav_trash"}}{{if eq .Folder "Trash"}}active{{end}}{{end}}
+{{define "nav_starred"}}{{if eq .Folder "Starred"}}active{{end}}{{end}}
 
 {{define "content"}}
 {{if .Error}}
@@ -47,16 +48,23 @@
                         <div class="email-date">{{.Date.Format "Jan 2"}}</div>
                     </a>
                     <div class="email-item-actions">
+                        {{if not .Seen}}
                         <form method="POST" action="/mark" onclick="event.stopPropagation()">
                             <input type="hidden" name="uid" value="{{.UID}}">
                             <input type="hidden" name="folder" value="{{$.Folder}}">
-                            <input type="hidden" name="seen" value="{{if .Seen}}false{{else}}true{{end}}">
-                            <button type="submit" class="email-action-btn" title="{{if .Seen}}Mark as unread{{else}}Mark as read{{end}}">
-                                {{if .Seen}}
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                                {{else}}
+                            <input type="hidden" name="seen" value="true">
+                            <button type="submit" class="email-action-btn" title="Mark as read">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                {{end}}
+                            </button>
+                        </form>
+                        {{end}}
+                        <form method="POST" action="/star" onclick="event.stopPropagation()">
+                            <input type="hidden" name="uid" value="{{.UID}}">
+                            <input type="hidden" name="folder" value="{{$.Folder}}">
+                            <input type="hidden" name="flagged" value="{{if .Flagged}}false{{else}}true{{end}}">
+                            <input type="hidden" name="redirect" value="/inbox?folder={{$.Folder}}&page={{$.Page}}">
+                            <button type="submit" class="email-action-btn email-action-star {{if .Flagged}}email-action-star-active{{end}}" title="{{if .Flagged}}Unstar{{else}}Star{{end}}">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="{{if .Flagged}}currentColor{{else}}none{{end}}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                             </button>
                         </form>
                         <form method="POST" action="/delete" onclick="event.stopPropagation()" onsubmit="return confirm('{{if eq $.Folder "Trash"}}Permanently delete?{{else}}Move to Trash?{{end}}')">

@@ -156,7 +156,9 @@ func fetchEmailsForUser(email, password, folder string, page int) ([]EmailMessag
 		for _, flag := range msg.Flags {
 			if flag == goimap.SeenFlag {
 				e.Seen = true
-				break
+			}
+			if flag == goimap.FlaggedFlag {
+				e.Flagged = true
 			}
 		}
 
@@ -224,6 +226,9 @@ func fetchEmailHeaderByUID(email, password, folder string, uid uint32) (*EmailMe
 		for _, flag := range msg.Flags {
 			if flag == goimap.SeenFlag {
 				em.Seen = true
+			}
+			if flag == goimap.FlaggedFlag {
+				em.Flagged = true
 			}
 		}
 	}
@@ -503,6 +508,131 @@ func markEmailSeen(email, password, folder string, uid uint32, seen bool) error 
 	return c.UidStore(seqSet, item, flags, nil)
 }
 
+// toggleEmailFlagged sets or clears the \Flagged flag on a message.
+func toggleEmailFlagged(email, password, folder string, uid uint32, flagged bool) error {
+	c, err := client.Dial("localhost:143")
+	if err != nil {
+		return fmt.Errorf("IMAP connection failed: %w", err)
+	}
+	defer c.Logout()
+
+	if err := c.Login(email, password); err != nil {
+		return fmt.Errorf("IMAP login failed: %w", err)
+	}
+
+	if _, err := c.Select(folder, false); err != nil {
+		return fmt.Errorf("select folder failed: %w", err)
+	}
+
+	seqSet := new(goimap.SeqSet)
+	seqSet.AddNum(uid)
+
+	var op goimap.FlagsOp = goimap.AddFlags
+	if !flagged {
+		op = goimap.RemoveFlags
+	}
+	item := goimap.FormatFlagsOp(op, true)
+	flags := []interface{}{goimap.FlaggedFlag}
+	return c.UidStore(seqSet, item, flags, nil)
+}
+
+// fetchStarredEmails searches all folders for messages with the \Flagged flag.
+func fetchStarredEmails(email, password string) ([]EmailMessage, error) {
+	c, err := client.Dial("localhost:143")
+	if err != nil {
+		return nil, fmt.Errorf("IMAP connection failed: %w", err)
+	}
+	defer c.Logout()
+
+	if err := c.Login(email, password); err != nil {
+		return nil, fmt.Errorf("IMAP login failed: %w", err)
+	}
+
+	// List mailboxes
+	mailboxes := make(chan *goimap.MailboxInfo, 20)
+	listDone := make(chan error, 1)
+	go func() {
+		listDone <- c.List("", "*", mailboxes)
+	}()
+	var folders []string
+	for m := range mailboxes {
+		folders = append(folders, m.Name)
+	}
+	if err := <-listDone; err != nil {
+		log.Printf("Portal: starred list warning: %v", err)
+	}
+
+	var allEmails []EmailMessage
+	for _, folder := range folders {
+		mbox, err := c.Select(folder, true)
+		if err != nil || mbox.Messages == 0 {
+			continue
+		}
+
+		criteria := goimap.NewSearchCriteria()
+		criteria.WithFlags = []string{goimap.FlaggedFlag}
+		uids, err := c.UidSearch(criteria)
+		if err != nil || len(uids) == 0 {
+			continue
+		}
+
+		seqSet := new(goimap.SeqSet)
+		for _, uid := range uids {
+			seqSet.AddNum(uid)
+		}
+
+		items := []goimap.FetchItem{goimap.FetchUid, goimap.FetchEnvelope, goimap.FetchFlags}
+		messages := make(chan *goimap.Message, len(uids))
+		fetchDone := make(chan error, 1)
+		go func() {
+			fetchDone <- c.UidFetch(seqSet, items, messages)
+		}()
+
+		for msg := range messages {
+			e := EmailMessage{
+				UID:     msg.Uid,
+				Flagged: true,
+				Date:    time.Now(),
+			}
+			if msg.Envelope != nil {
+				e.Subject = msg.Envelope.Subject
+				if msg.Envelope.Date != (time.Time{}) {
+					e.Date = msg.Envelope.Date
+				}
+				if len(msg.Envelope.From) > 0 && msg.Envelope.From[0] != nil {
+					addr := msg.Envelope.From[0]
+					if addr.PersonalName != "" {
+						e.From = fmt.Sprintf("%s <%s@%s>", addr.PersonalName, addr.MailboxName, addr.HostName)
+					} else {
+						e.From = fmt.Sprintf("%s@%s", addr.MailboxName, addr.HostName)
+					}
+				}
+				e.To = imapAddrsToString(msg.Envelope.To)
+				e.CC = imapAddrsToString(msg.Envelope.Cc)
+			}
+			for _, flag := range msg.Flags {
+				if flag == goimap.SeenFlag {
+					e.Seen = true
+				}
+			}
+			allEmails = append(allEmails, e)
+		}
+		if err := <-fetchDone; err != nil {
+			log.Printf("Portal: starred fetch warning (%s): %v", folder, err)
+		}
+	}
+
+	// Sort newest first
+	for i := 0; i < len(allEmails)-1; i++ {
+		for j := i + 1; j < len(allEmails); j++ {
+			if allEmails[j].Date.After(allEmails[i].Date) {
+				allEmails[i], allEmails[j] = allEmails[j], allEmails[i]
+			}
+		}
+	}
+	return allEmails, nil
+}
+
 // moveEmail copies a message to toFolder then removes it from fromFolder.
 func moveEmail(email, password, fromFolder, toFolder string, uid uint32) error {
 	c, err := client.Dial("localhost:143")
@@ -764,6 +894,10 @@ func PortalHandler(cfg *config.Config) http.HandlerFunc {
 			portalMove(w, r, cfg, sess)
 		case path == "/empty-trash":
 			portalEmptyTrash(w, r, cfg, sess)
+		case path == "/star":
+			portalStar(w, r, cfg, sess)
+		case path == "/starred":
+			portalStarred(w, r, cfg, sess)
 		case path == "/credentials":
 			portalCredentials(w, r, cfg, sess)
 		default:
@@ -1106,6 +1240,56 @@ func portalEmptyTrash(w http.ResponseWriter, r *http.Request, cfg *config.Config
 		log.Printf("Portal: empty trash error for %s: %v", sess.Email, err)
 	}
 	http.Redirect(w, r, "/inbox?folder=Trash", http.StatusSeeOther)
+}
+
+func portalStar(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	folder := r.FormValue("folder")
+	if folder == "" {
+		folder = "INBOX"
+	}
+	uidStr := r.FormValue("uid")
+	uid64, err := strconv.ParseUint(uidStr, 10, 32)
+	if err != nil {
+		http.Redirect(w, r, "/inbox?folder="+folder, http.StatusSeeOther)
+		return
+	}
+	flagged := r.FormValue("flagged") == "true"
+	if err := toggleEmailFlagged(sess.Email, sess.Password, folder, uint32(uid64), flagged); err != nil {
+		log.Printf("Portal: star error for %s: %v", sess.Email, err)
+	}
+	redirectTo := r.FormValue("redirect")
+	if redirectTo == "" {
+		redirectTo = "/inbox?folder=" + folder
+	}
+	http.Redirect(w, r, redirectTo, http.StatusSeeOther)
+}
+
+func portalStarred(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
+	data := portalInboxData{
+		Domain:     cfg.Domain,
+		Email:      sess.Email,
+		Folder:     "Starred",
+		Folders:    []string{"INBOX", "Sent", "Drafts", "Trash", "Junk"},
+		Page:       1,
+		TotalPages: 1,
+	}
+
+	emails, err := fetchStarredEmails(sess.Email, sess.Password)
+	if err != nil {
+		data.Error = fmt.Sprintf("Failed to load starred emails: %v", err)
+		renderPortalTemplate(w, "portal_inbox.html", data)
+		return
+	}
+	data.Emails = emails
+	renderPortalTemplate(w, "portal_inbox.html", data)
 }
 
 // extractEmailAddress pulls the email address out of "Name <email>" or returns the string as-is.
