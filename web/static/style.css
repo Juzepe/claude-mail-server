@@ -758,19 +758,31 @@ code.dns-value {
 .email-item.email-selected { background: var(--accent-light); border-left: 3px solid var(--accent); }
 .email-item.email-unread .email-sender { font-weight: 700; color: var(--text-primary); }
 .email-item.email-unread .email-subject { font-weight: 600; }
-.email-mark-form { display: flex; align-items: center; padding: 0 6px 0 12px; flex-shrink: 0; }
-.email-dot-btn {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    border: 1.5px solid var(--text-muted);
-    background: transparent;
-    cursor: pointer;
-    padding: 0;
-    flex-shrink: 0;
+.email-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 8px;
+    opacity: 0;
     transition: opacity 0.15s;
+    flex-shrink: 0;
 }
-.email-dot-btn:hover { opacity: 0.6; }
-.email-dot-unread { background: var(--accent); border-color: var(--accent); }
+.email-item:hover .email-item-actions { opacity: 1; }
+.email-item.email-selected .email-item-actions { opacity: 1; }
+.email-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px; height: 28px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+}
+.email-action-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.email-action-delete:hover { color: var(--error); }
 .email-item-link {
     flex: 1;
     display: grid;
