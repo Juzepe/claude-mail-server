@@ -40,12 +40,21 @@
             {{if .Emails}}
             <div class="email-list">
                 {{range .Emails}}
-                <a href="/inbox?folder={{$.Folder}}&uid={{.UID}}&page={{$.Page}}"
-                   class="email-item {{if not .Seen}}email-unread{{end}} {{if and $.SelectedEmail (eq $.SelectedEmail.UID .UID)}}email-selected{{end}}">
-                    <div class="email-sender">{{.From}}</div>
-                    <div class="email-subject">{{if .Subject}}{{.Subject}}{{else}}(no subject){{end}}</div>
-                    <div class="email-date">{{.Date.Format "Jan 2"}}</div>
-                </a>
+                <div class="email-item {{if not .Seen}}email-unread{{end}} {{if and $.SelectedEmail (eq $.SelectedEmail.UID .UID)}}email-selected{{end}}">
+                    {{if eq $.Folder "INBOX"}}
+                    <form method="POST" action="/mark" class="email-mark-form" onclick="event.stopPropagation()">
+                        <input type="hidden" name="uid" value="{{.UID}}">
+                        <input type="hidden" name="folder" value="INBOX">
+                        <input type="hidden" name="seen" value="{{if .Seen}}false{{else}}true{{end}}">
+                        <button type="submit" class="email-dot-btn {{if .Seen}}email-dot-read{{else}}email-dot-unread{{end}}" title="{{if .Seen}}Mark as unread{{else}}Mark as read{{end}}"></button>
+                    </form>
+                    {{end}}
+                    <a href="/inbox?folder={{$.Folder}}&uid={{.UID}}&page={{$.Page}}" class="email-item-link">
+                        <div class="email-sender">{{.From}}</div>
+                        <div class="email-subject">{{if .Subject}}{{.Subject}}{{else}}(no subject){{end}}</div>
+                        <div class="email-date">{{.Date.Format "Jan 2"}}</div>
+                    </a>
+                </div>
                 {{end}}
             </div>
             {{if gt .TotalPages 1}}
@@ -127,14 +136,6 @@
                     </svg>
                     Forward
                 </a>
-                <form method="POST" action="/mark" style="display:inline">
-                    <input type="hidden" name="uid" value="{{.SelectedEmail.UID}}">
-                    <input type="hidden" name="folder" value="{{.Folder}}">
-                    <input type="hidden" name="seen" value="{{if .SelectedEmail.Seen}}false{{else}}true{{end}}">
-                    <button type="submit" class="btn btn-secondary btn-sm">
-                        {{if .SelectedEmail.Seen}}Mark unread{{else}}Mark read{{end}}
-                    </button>
-                </form>
                 {{if eq .Folder "Trash"}}
                 <form method="POST" action="/move" style="display:inline">
                     <input type="hidden" name="uid" value="{{.SelectedEmail.UID}}">

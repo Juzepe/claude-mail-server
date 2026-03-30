@@ -829,7 +829,12 @@ func portalInbox(w http.ResponseWriter, r *http.Request, cfg *config.Config, ses
 					body, err := fetchBodyForUser(sess.Email, sess.Password, folder, uid)
 					if err == nil {
 						emails[i].Body = body
+						emails[i].Seen = true // optimistic update for template
 						data.SelectedEmail = &emails[i]
+						// Auto-mark as read when opening
+						if !e.Seen {
+							go markEmailSeen(sess.Email, sess.Password, folder, uid, true)
+						}
 					}
 					break
 				}
