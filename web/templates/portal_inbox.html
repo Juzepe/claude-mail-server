@@ -47,11 +47,12 @@
                         <div class="email-subject">{{if .Subject}}{{.Subject}}{{else}}(no subject){{end}}</div>
                         <div class="email-date">{{.Date.Format "Jan 2"}}</div>
                     </a>
+                    {{$emailFolder := .Folder}}{{if not $emailFolder}}{{$emailFolder = $.Folder}}{{end}}
                     <div class="email-item-actions">
                         {{if not .Seen}}
                         <form method="POST" action="/mark" onclick="event.stopPropagation()">
                             <input type="hidden" name="uid" value="{{.UID}}">
-                            <input type="hidden" name="folder" value="{{$.Folder}}">
+                            <input type="hidden" name="folder" value="{{$emailFolder}}">
                             <input type="hidden" name="seen" value="true">
                             <button type="submit" class="email-action-btn" title="Mark as read">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -60,17 +61,17 @@
                         {{end}}
                         <form method="POST" action="/star" onclick="event.stopPropagation()">
                             <input type="hidden" name="uid" value="{{.UID}}">
-                            <input type="hidden" name="folder" value="{{$.Folder}}">
+                            <input type="hidden" name="folder" value="{{$emailFolder}}">
                             <input type="hidden" name="flagged" value="{{if .Flagged}}false{{else}}true{{end}}">
                             <input type="hidden" name="redirect" value="{{if eq $.Folder "Starred"}}/starred{{else}}/inbox?folder={{$.Folder}}&page={{$.Page}}{{end}}">
                             <button type="submit" class="email-action-btn email-action-star {{if .Flagged}}email-action-star-active{{end}}" title="{{if .Flagged}}Unstar{{else}}Star{{end}}">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="{{if .Flagged}}currentColor{{else}}none{{end}}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                             </button>
                         </form>
-                        <form method="POST" action="/delete" onclick="event.stopPropagation()" onsubmit="return confirm('{{if eq $.Folder "Trash"}}Permanently delete?{{else}}Move to Trash?{{end}}')">
+                        <form method="POST" action="/delete" onclick="event.stopPropagation()" onsubmit="return confirm('{{if eq $emailFolder "Trash"}}Permanently delete?{{else}}Move to Trash?{{end}}')">
                             <input type="hidden" name="uid" value="{{.UID}}">
-                            <input type="hidden" name="folder" value="{{$.Folder}}">
-                            <button type="submit" class="email-action-btn email-action-delete" title="{{if eq $.Folder "Trash"}}Delete permanently{{else}}Delete{{end}}">
+                            <input type="hidden" name="folder" value="{{$emailFolder}}">
+                            <button type="submit" class="email-action-btn email-action-delete" title="{{if eq $emailFolder "Trash"}}Delete permanently{{else}}Delete{{end}}">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
                             </button>
                         </form>
