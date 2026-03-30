@@ -20,6 +20,8 @@ import (
 type EmailMessage struct {
 	UID     uint32
 	From    string
+	To      string
+	CC      string
 	Subject string
 	Date    time.Time
 	Seen    bool

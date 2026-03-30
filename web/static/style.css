@@ -790,7 +790,12 @@ code.dns-value {
 }
 
 .email-meta { margin-bottom: 12px; }
-.email-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.email-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center; }
+.move-form { display: inline-flex !important; align-items: center; gap: 4px; }
+.form-select-sm { padding: 4px 8px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); }
+.compose-field-toggles { float: right; font-weight: normal; }
+.compose-toggle-link { font-size: 0.75rem; color: var(--text-muted); margin-left: 8px; text-decoration: none; }
+.compose-toggle-link:hover { color: var(--accent); }
 .pagination { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
 .pagination-info { font-size: 0.8rem; color: var(--text-secondary); flex: 1; text-align: center; }
 .btn.disabled { opacity: 0.4; pointer-events: none; }

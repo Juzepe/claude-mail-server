@@ -30,6 +30,11 @@
                 </svg>
                 {{.Folder}} ({{len .Emails}})
             </h2>
+            {{if eq .Folder "Trash"}}
+            <form method="POST" action="/empty-trash" onsubmit="return confirm('Permanently delete all emails in Trash?')">
+                <button type="submit" class="btn btn-danger btn-sm">Empty Trash</button>
+            </form>
+            {{end}}
         </div>
         <div class="card-body p-0">
             {{if .Emails}}
@@ -85,12 +90,18 @@
                     <span>{{.SelectedEmail.From}}</span>
                 </div>
                 <div class="email-meta-row">
+                    <span class="email-meta-label">To:</span>
+                    <span>{{if .SelectedEmail.To}}{{.SelectedEmail.To}}{{else}}{{.Email}}{{end}}</span>
+                </div>
+                {{if .SelectedEmail.CC}}
+                <div class="email-meta-row">
+                    <span class="email-meta-label">CC:</span>
+                    <span>{{.SelectedEmail.CC}}</span>
+                </div>
+                {{end}}
+                <div class="email-meta-row">
                     <span class="email-meta-label">Date:</span>
                     <span>{{.SelectedEmail.Date.Format "Monday, January 2, 2006 at 15:04"}}</span>
-                </div>
-                <div class="email-meta-row">
-                    <span class="email-meta-label">To:</span>
-                    <span>{{.Email}}</span>
                 </div>
             </div>
             <div class="email-actions">
@@ -100,6 +111,14 @@
                         <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
                     </svg>
                     Reply
+                </a>
+                <a href="/reply?uid={{.SelectedEmail.UID}}&folder={{.Folder}}&all=1" class="btn btn-secondary btn-sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 17 4 12 9 7"/>
+                        <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+                        <polyline points="13 17 8 12 13 7"/>
+                    </svg>
+                    Reply All
                 </a>
                 <a href="/forward?uid={{.SelectedEmail.UID}}&folder={{.Folder}}" class="btn btn-secondary btn-sm">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -113,22 +132,40 @@
                     <input type="hidden" name="folder" value="{{.Folder}}">
                     <input type="hidden" name="seen" value="{{if .SelectedEmail.Seen}}false{{else}}true{{end}}">
                     <button type="submit" class="btn btn-secondary btn-sm">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                            <circle cx="12" cy="12" r="3"/>
-                        </svg>
                         {{if .SelectedEmail.Seen}}Mark unread{{else}}Mark read{{end}}
                     </button>
                 </form>
-                <form method="POST" action="/delete" style="display:inline" onsubmit="return confirm('{{if eq .Folder "Trash"}}Permanently delete this email?{{else}}Move to Trash?{{end}}')">
+                {{if eq .Folder "Trash"}}
+                <form method="POST" action="/move" style="display:inline">
+                    <input type="hidden" name="uid" value="{{.SelectedEmail.UID}}">
+                    <input type="hidden" name="folder" value="{{.Folder}}">
+                    <input type="hidden" name="to_folder" value="INBOX">
+                    <button type="submit" class="btn btn-secondary btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 14 4 9 9 4"/>
+                            <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
+                        </svg>
+                        Restore to Inbox
+                    </button>
+                </form>
+                {{end}}
+                <form method="POST" action="/move" style="display:inline" class="move-form">
+                    <input type="hidden" name="uid" value="{{.SelectedEmail.UID}}">
+                    <input type="hidden" name="folder" value="{{.Folder}}">
+                    <select name="to_folder" class="form-select form-select-sm">
+                        <option value="" disabled selected>Move to…</option>
+                        {{range .Folders}}{{if ne . $.Folder}}<option value="{{.}}">{{.}}</option>{{end}}{{end}}
+                    </select>
+                    <button type="submit" class="btn btn-secondary btn-sm">Move</button>
+                </form>
+                <form method="POST" action="/delete" style="display:inline" onsubmit="return confirm('{{if eq .Folder "Trash"}}Permanently delete?{{else}}Move to Trash?{{end}}')">
                     <input type="hidden" name="uid" value="{{.SelectedEmail.UID}}">
                     <input type="hidden" name="folder" value="{{.Folder}}">
                     <button type="submit" class="btn btn-danger btn-sm">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"/>
                             <path d="M19 6l-1 14H6L5 6"/>
-                            <path d="M10 11v6M14 11v6"/>
-                            <path d="M9 6V4h6v2"/>
+                            <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
                         </svg>
                         {{if eq .Folder "Trash"}}Delete permanently{{else}}Delete{{end}}
                     </button>

@@ -42,16 +42,46 @@
             </div>
 
             <div class="form-group">
-                <label for="to" class="form-label">To</label>
+                <label for="to" class="form-label">
+                    To
+                    <span class="compose-field-toggles">
+                        <a href="#" class="compose-toggle-link" onclick="toggleField('cc-row');return false">CC</a>
+                        <a href="#" class="compose-toggle-link" onclick="toggleField('bcc-row');return false">BCC</a>
+                    </span>
+                </label>
                 <input
-                    type="email"
+                    type="text"
                     id="to"
                     name="to"
                     class="form-input"
                     value="{{.To}}"
-                    placeholder="recipient@example.com"
+                    placeholder="recipient@example.com (comma-separate multiple)"
                     required
                     autofocus
+                >
+            </div>
+
+            <div class="form-group" id="cc-row" style="{{if .CC}}{{else}}display:none{{end}}">
+                <label for="cc" class="form-label">CC</label>
+                <input
+                    type="text"
+                    id="cc"
+                    name="cc"
+                    class="form-input"
+                    value="{{.CC}}"
+                    placeholder="cc@example.com"
+                >
+            </div>
+
+            <div class="form-group" id="bcc-row" style="{{if .BCC}}{{else}}display:none{{end}}">
+                <label for="bcc" class="form-label">BCC</label>
+                <input
+                    type="text"
+                    id="bcc"
+                    name="bcc"
+                    class="form-input"
+                    value="{{.BCC}}"
+                    placeholder="bcc@example.com"
                 >
             </div>
 
@@ -101,4 +131,11 @@
         </form>
     </div>
 </div>
+
+<script>
+function toggleField(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+</script>
 {{end}}

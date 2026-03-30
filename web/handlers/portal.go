@@ -149,6 +149,8 @@ func fetchEmailsForUser(email, password, folder string, page int) ([]EmailMessag
 					e.From = fmt.Sprintf("%s@%s", addr.MailboxName, addr.HostName)
 				}
 			}
+			e.To = imapAddrsToString(msg.Envelope.To)
+			e.CC = imapAddrsToString(msg.Envelope.Cc)
 		}
 
 		for _, flag := range msg.Flags {
@@ -216,6 +218,8 @@ func fetchEmailHeaderByUID(email, password, folder string, uid uint32) (*EmailMe
 					em.From = fmt.Sprintf("%s@%s", addr.MailboxName, addr.HostName)
 				}
 			}
+			em.To = imapAddrsToString(msg.Envelope.To)
+			em.CC = imapAddrsToString(msg.Envelope.Cc)
 		}
 		for _, flag := range msg.Flags {
 			if flag == goimap.SeenFlag {
@@ -337,16 +341,15 @@ func decodePart(r io.Reader, encoding string) string {
 // ---- SMTP send helper ------------------------------------------------------
 
 // sendEmailViaLocalSMTP dials localhost:587, does STARTTLS (InsecureSkipVerify),
-// authenticates with PlainAuth, and sends the message. Returns the raw RFC 2822
-// message bytes so the caller can save a copy to the Sent folder.
-func sendEmailViaLocalSMTP(from, password, to, subject, body string) ([]byte, error) {
+// authenticates with PlainAuth, and sends the message. to/cc/bcc may each be
+// comma-separated. Returns the raw RFC 2822 message bytes for Sent-folder saving.
+func sendEmailViaLocalSMTP(from, password, to, cc, bcc, subject, body string) ([]byte, error) {
 	c, err := smtp.Dial("localhost:587")
 	if err != nil {
 		return nil, fmt.Errorf("SMTP dial failed: %w", err)
 	}
 	defer c.Close()
 
-	// Issue STARTTLS
 	tlsCfg := &tls.Config{
 		InsecureSkipVerify: true, //nolint:gosec // intentional: connecting to localhost
 		ServerName:         "localhost",
@@ -355,28 +358,43 @@ func sendEmailViaLocalSMTP(from, password, to, subject, body string) ([]byte, er
 		return nil, fmt.Errorf("STARTTLS failed: %w", err)
 	}
 
-	// Authenticate
 	auth := smtp.PlainAuth("", from, password, "localhost")
 	if err := c.Auth(auth); err != nil {
 		return nil, fmt.Errorf("SMTP auth failed: %w", err)
 	}
 
-	// Envelope
 	if err := c.Mail(from); err != nil {
 		return nil, fmt.Errorf("SMTP MAIL FROM failed: %w", err)
 	}
-	if err := c.Rcpt(to); err != nil {
-		return nil, fmt.Errorf("SMTP RCPT TO failed: %w", err)
+
+	// RCPT TO for every address (To + CC + BCC all get the message)
+	allRcpts := append(append(splitAddresses(to), splitAddresses(cc)...), splitAddresses(bcc)...)
+	if len(allRcpts) == 0 {
+		return nil, fmt.Errorf("no recipients specified")
+	}
+	for _, rcpt := range allRcpts {
+		if err := c.Rcpt(rcpt); err != nil {
+			return nil, fmt.Errorf("SMTP RCPT TO %s failed: %w", rcpt, err)
+		}
 	}
 
-	// Message data
 	wc, err := c.Data()
 	if err != nil {
 		return nil, fmt.Errorf("SMTP DATA failed: %w", err)
 	}
 
-	rawMsg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
-		from, to, subject, time.Now().Format("Mon, 02 Jan 2006 15:04:05 -0700"), body))
+	// Build headers (BCC intentionally omitted from headers)
+	var hdr strings.Builder
+	hdr.WriteString(fmt.Sprintf("From: %s\r\n", from))
+	hdr.WriteString(fmt.Sprintf("To: %s\r\n", to))
+	if cc != "" {
+		hdr.WriteString(fmt.Sprintf("Cc: %s\r\n", cc))
+	}
+	hdr.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	hdr.WriteString(fmt.Sprintf("Date: %s\r\n", time.Now().Format("Mon, 02 Jan 2006 15:04:05 -0700")))
+	hdr.WriteString("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n")
+	rawMsg := []byte(hdr.String() + body)
+
 	if _, err := wc.Write(rawMsg); err != nil {
 		wc.Close()
 		return nil, fmt.Errorf("SMTP write failed: %w", err)
@@ -483,6 +501,101 @@ func markEmailSeen(email, password, folder string, uid uint32, seen bool) error 
 	item := goimap.FormatFlagsOp(op, true)
 	flags := []interface{}{goimap.SeenFlag}
 	return c.UidStore(seqSet, item, flags, nil)
+}
+
+// moveEmail copies a message to toFolder then removes it from fromFolder.
+func moveEmail(email, password, fromFolder, toFolder string, uid uint32) error {
+	c, err := client.Dial("localhost:143")
+	if err != nil {
+		return fmt.Errorf("IMAP connection failed: %w", err)
+	}
+	defer c.Logout()
+
+	if err := c.Login(email, password); err != nil {
+		return fmt.Errorf("IMAP login failed: %w", err)
+	}
+
+	if _, err := c.Select(fromFolder, false); err != nil {
+		return fmt.Errorf("select folder failed: %w", err)
+	}
+
+	// Ensure destination exists
+	if err := c.Create(toFolder); err != nil && !strings.Contains(err.Error(), "exist") {
+		log.Printf("Portal: create folder %q failed: %v", toFolder, err)
+	}
+
+	seqSet := new(goimap.SeqSet)
+	seqSet.AddNum(uid)
+
+	if err := c.UidCopy(seqSet, toFolder); err != nil {
+		return fmt.Errorf("copy to %q failed: %w", toFolder, err)
+	}
+
+	item := goimap.FormatFlagsOp(goimap.AddFlags, true)
+	flags := []interface{}{goimap.DeletedFlag}
+	if err := c.UidStore(seqSet, item, flags, nil); err != nil {
+		return fmt.Errorf("mark deleted failed: %w", err)
+	}
+	return c.Expunge(nil)
+}
+
+// emptyFolder permanently deletes all messages in the given folder.
+func emptyFolder(email, password, folder string) error {
+	c, err := client.Dial("localhost:143")
+	if err != nil {
+		return fmt.Errorf("IMAP connection failed: %w", err)
+	}
+	defer c.Logout()
+
+	if err := c.Login(email, password); err != nil {
+		return fmt.Errorf("IMAP login failed: %w", err)
+	}
+
+	mbox, err := c.Select(folder, false)
+	if err != nil {
+		return fmt.Errorf("select folder failed: %w", err)
+	}
+	if mbox.Messages == 0 {
+		return nil
+	}
+
+	seqSet := new(goimap.SeqSet)
+	seqSet.AddRange(1, mbox.Messages)
+
+	item := goimap.FormatFlagsOp(goimap.AddFlags, true)
+	flags := []interface{}{goimap.DeletedFlag}
+	if err := c.Store(seqSet, item, flags, nil); err != nil {
+		return fmt.Errorf("mark deleted failed: %w", err)
+	}
+	return c.Expunge(nil)
+}
+
+// imapAddrsToString formats a slice of IMAP addresses as a comma-separated string.
+func imapAddrsToString(addrs []*goimap.Address) string {
+	var parts []string
+	for _, addr := range addrs {
+		if addr == nil {
+			continue
+		}
+		if addr.PersonalName != "" {
+			parts = append(parts, fmt.Sprintf("%s <%s@%s>", addr.PersonalName, addr.MailboxName, addr.HostName))
+		} else {
+			parts = append(parts, fmt.Sprintf("%s@%s", addr.MailboxName, addr.HostName))
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+// splitAddresses splits a comma-separated address string into trimmed, non-empty parts.
+func splitAddresses(s string) []string {
+	var result []string
+	for _, addr := range strings.Split(s, ",") {
+		addr = strings.TrimSpace(addr)
+		if addr != "" {
+			result = append(result, addr)
+		}
+	}
+	return result
 }
 
 // ---- Template rendering helpers --------------------------------------------
@@ -647,6 +760,10 @@ func PortalHandler(cfg *config.Config) http.HandlerFunc {
 			portalDelete(w, r, cfg, sess)
 		case path == "/mark":
 			portalMarkSeen(w, r, cfg, sess)
+		case path == "/move":
+			portalMove(w, r, cfg, sess)
+		case path == "/empty-trash":
+			portalEmptyTrash(w, r, cfg, sess)
 		case path == "/credentials":
 			portalCredentials(w, r, cfg, sess)
 		default:
@@ -729,6 +846,8 @@ type portalComposeData struct {
 	Error      string
 	Flash      string
 	To         string
+	CC         string
+	BCC        string
 	Subject    string
 	Body       string
 	QuotedBody string // read-only original message shown below textarea
@@ -749,6 +868,8 @@ func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 		}
 
 		to := strings.TrimSpace(r.FormValue("to"))
+		cc := strings.TrimSpace(r.FormValue("cc"))
+		bcc := strings.TrimSpace(r.FormValue("bcc"))
 		subject := strings.TrimSpace(r.FormValue("subject"))
 		body := r.FormValue("body")
 		quotedBody := r.FormValue("quoted_body")
@@ -756,6 +877,8 @@ func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 		log.Printf("Portal: compose sending from=%s to=%s subject=%q", sess.Email, to, subject)
 
 		data.To = to
+		data.CC = cc
+		data.BCC = bcc
 		data.Subject = subject
 		data.Body = body
 		data.QuotedBody = quotedBody
@@ -775,7 +898,7 @@ func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 			return
 		}
 
-		rawMsg, err := sendEmailViaLocalSMTP(sess.Email, sess.Password, to, subject, body)
+		rawMsg, err := sendEmailViaLocalSMTP(sess.Email, sess.Password, to, cc, bcc, subject, body)
 		if err != nil {
 			log.Printf("Portal: send email error for %s: %v", sess.Email, err)
 			data.Error = fmt.Sprintf("Failed to send email: %v", err)
@@ -787,6 +910,8 @@ func portalCompose(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 
 		// Success — clear fields and show flash
 		data.To = ""
+		data.CC = ""
+		data.BCC = ""
 		data.Subject = ""
 		data.Body = ""
 		data.Flash = "Email sent successfully."
@@ -817,17 +942,29 @@ func portalReply(w http.ResponseWriter, r *http.Request, cfg *config.Config, ses
 
 	body, _ := fetchBodyForUser(sess.Email, sess.Password, folder, uid)
 
-	// Build reply fields
 	replyTo := extractEmailAddress(original.From)
 	replySubject := original.Subject
 	if !strings.HasPrefix(strings.ToLower(replySubject), "re:") {
 		replySubject = "Re: " + replySubject
 	}
 
+	// Reply-all: include all original recipients (To + CC) except self
+	var replyCC string
+	if q.Get("all") == "1" {
+		var ccAddrs []string
+		for _, addr := range splitAddresses(original.To + "," + original.CC) {
+			if addr != "" && addr != sess.Email {
+				ccAddrs = append(ccAddrs, addr)
+			}
+		}
+		replyCC = strings.Join(ccAddrs, ", ")
+	}
+
 	data := portalComposeData{
 		Domain:     cfg.Domain,
 		Email:      sess.Email,
 		To:         replyTo,
+		CC:         replyCC,
 		Subject:    replySubject,
 		QuotedBody: body,
 	}
@@ -922,6 +1059,48 @@ func portalForward(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 		QuotedBody: body,
 	}
 	renderPortalTemplate(w, "portal_compose.html", data)
+}
+
+func portalMove(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	fromFolder := r.FormValue("folder")
+	if fromFolder == "" {
+		fromFolder = "INBOX"
+	}
+	toFolder := r.FormValue("to_folder")
+	if toFolder == "" || toFolder == fromFolder {
+		http.Redirect(w, r, "/inbox?folder="+fromFolder, http.StatusSeeOther)
+		return
+	}
+	uidStr := r.FormValue("uid")
+	uid64, err := strconv.ParseUint(uidStr, 10, 32)
+	if err != nil {
+		http.Redirect(w, r, "/inbox?folder="+fromFolder, http.StatusSeeOther)
+		return
+	}
+
+	if err := moveEmail(sess.Email, sess.Password, fromFolder, toFolder, uint32(uid64)); err != nil {
+		log.Printf("Portal: move error for %s: %v", sess.Email, err)
+	}
+	http.Redirect(w, r, "/inbox?folder="+fromFolder, http.StatusSeeOther)
+}
+
+func portalEmptyTrash(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/inbox?folder=Trash", http.StatusSeeOther)
+		return
+	}
+	if err := emptyFolder(sess.Email, sess.Password, "Trash"); err != nil {
+		log.Printf("Portal: empty trash error for %s: %v", sess.Email, err)
+	}
+	http.Redirect(w, r, "/inbox?folder=Trash", http.StatusSeeOther)
 }
 
 // extractEmailAddress pulls the email address out of "Name <email>" or returns the string as-is.
