@@ -19,6 +19,7 @@ import (
 // EmailMessage represents a single email in the list.
 type EmailMessage struct {
 	UID     uint32
+	Folder  string
 	From    string
 	To      string
 	CC      string

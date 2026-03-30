@@ -42,7 +42,7 @@
             <div class="email-list">
                 {{range .Emails}}
                 <div class="email-item {{if not .Seen}}email-unread{{end}} {{if and $.SelectedEmail (eq $.SelectedEmail.UID .UID)}}email-selected{{end}}">
-                    <a href="/inbox?folder={{$.Folder}}&uid={{.UID}}&page={{$.Page}}" class="email-item-link">
+                    <a href="{{if eq $.Folder "Starred"}}/starred?uid={{.UID}}{{else}}/inbox?folder={{$.Folder}}&uid={{.UID}}&page={{$.Page}}{{end}}" class="email-item-link">
                         <div class="email-sender">{{.From}}</div>
                         <div class="email-subject">{{if .Subject}}{{.Subject}}{{else}}(no subject){{end}}</div>
                         <div class="email-date">{{.Date.Format "Jan 2"}}</div>
@@ -62,7 +62,7 @@
                             <input type="hidden" name="uid" value="{{.UID}}">
                             <input type="hidden" name="folder" value="{{$.Folder}}">
                             <input type="hidden" name="flagged" value="{{if .Flagged}}false{{else}}true{{end}}">
-                            <input type="hidden" name="redirect" value="/inbox?folder={{$.Folder}}&page={{$.Page}}">
+                            <input type="hidden" name="redirect" value="{{if eq $.Folder "Starred"}}/starred{{else}}/inbox?folder={{$.Folder}}&page={{$.Page}}{{end}}">
                             <button type="submit" class="email-action-btn email-action-star {{if .Flagged}}email-action-star-active{{end}}" title="{{if .Flagged}}Unstar{{else}}Star{{end}}">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="{{if .Flagged}}currentColor{{else}}none{{end}}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                             </button>

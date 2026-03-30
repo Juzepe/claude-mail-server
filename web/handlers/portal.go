@@ -591,6 +591,7 @@ func fetchStarredEmails(email, password string) ([]EmailMessage, error) {
 		for msg := range messages {
 			e := EmailMessage{
 				UID:     msg.Uid,
+				Folder:  folder,
 				Flagged: true,
 				Date:    time.Now(),
 			}
@@ -925,6 +926,10 @@ func portalInbox(w http.ResponseWriter, r *http.Request, cfg *config.Config, ses
 	folder := q.Get("folder")
 	if folder == "" {
 		folder = "INBOX"
+	}
+	if folder == "Starred" {
+		http.Redirect(w, r, "/starred", http.StatusSeeOther)
+		return
 	}
 	uidStr := q.Get("uid")
 	page, _ := strconv.Atoi(q.Get("page"))
@@ -1289,6 +1294,33 @@ func portalStarred(w http.ResponseWriter, r *http.Request, cfg *config.Config, s
 		return
 	}
 	data.Emails = emails
+
+	uidStr := r.URL.Query().Get("uid")
+	if uidStr != "" {
+		uid64, err := strconv.ParseUint(uidStr, 10, 32)
+		if err == nil {
+			uid := uint32(uid64)
+			for i, e := range emails {
+				if e.UID == uid {
+					srcFolder := e.Folder
+					if srcFolder == "" {
+						srcFolder = "INBOX"
+					}
+					body, err := fetchBodyForUser(sess.Email, sess.Password, srcFolder, uid)
+					if err == nil {
+						emails[i].Body = body
+						emails[i].Seen = true
+						data.SelectedEmail = &emails[i]
+						if !e.Seen {
+							go markEmailSeen(sess.Email, sess.Password, srcFolder, uid, true)
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
 	renderPortalTemplate(w, "portal_inbox.html", data)
 }
 
