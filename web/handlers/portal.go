@@ -476,7 +476,7 @@ func markEmailSeen(email, password, folder string, uid uint32, seen bool) error 
 	seqSet := new(goimap.SeqSet)
 	seqSet.AddNum(uid)
 
-	op := goimap.AddFlags
+	var op goimap.FlagsOp = goimap.AddFlags
 	if !seen {
 		op = goimap.RemoveFlags
 	}
