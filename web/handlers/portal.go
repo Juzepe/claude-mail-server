@@ -60,16 +60,17 @@ func authenticateIMAPUser(email, password string) bool {
 }
 
 // fetchEmailsForUser connects to the local IMAP server with the user's own
-// credentials and lists messages in the given folder.
-func fetchEmailsForUser(email, password, folder string) ([]EmailMessage, []string, error) {
+// credentials and lists messages in the given folder. page is 1-indexed;
+// returns the emails for that page, all folder names, and the total page count.
+func fetchEmailsForUser(email, password, folder string, page int) ([]EmailMessage, []string, int, error) {
 	c, err := client.Dial("localhost:143")
 	if err != nil {
-		return nil, nil, fmt.Errorf("IMAP connection failed: %w", err)
+		return nil, nil, 0, fmt.Errorf("IMAP connection failed: %w", err)
 	}
 	defer c.Logout()
 
 	if err := c.Login(email, password); err != nil {
-		return nil, nil, fmt.Errorf("IMAP login failed: %w", err)
+		return nil, nil, 0, fmt.Errorf("IMAP login failed: %w", err)
 	}
 
 	// List mailboxes
@@ -90,20 +91,31 @@ func fetchEmailsForUser(email, password, folder string) ([]EmailMessage, []strin
 	// Select the folder
 	mbox, err := c.Select(folder, true)
 	if err != nil {
-		return nil, folders, fmt.Errorf("folder %q not found: %w", folder, err)
+		return nil, folders, 0, fmt.Errorf("folder %q not found: %w", folder, err)
 	}
 
 	if mbox.Messages == 0 {
-		return []EmailMessage{}, folders, nil
+		return []EmailMessage{}, folders, 1, nil
 	}
 
-	// Fetch last 50 messages
-	from := uint32(1)
-	if mbox.Messages > 50 {
-		from = mbox.Messages - 49
+	// Pagination: newest messages first, 50 per page.
+	const pageSize = 50
+	n := int(mbox.Messages)
+	totalPages := (n + pageSize - 1) / pageSize
+	if page < 1 {
+		page = 1
 	}
+	if page > totalPages {
+		page = totalPages
+	}
+	toSeq := n - (page-1)*pageSize
+	fromSeq := toSeq - pageSize + 1
+	if fromSeq < 1 {
+		fromSeq = 1
+	}
+
 	seqSet := new(goimap.SeqSet)
-	seqSet.AddRange(from, mbox.Messages)
+	seqSet.AddRange(uint32(fromSeq), uint32(toSeq))
 
 	items := []goimap.FetchItem{
 		goimap.FetchUid,
@@ -111,7 +123,7 @@ func fetchEmailsForUser(email, password, folder string) ([]EmailMessage, []strin
 		goimap.FetchFlags,
 	}
 
-	messages := make(chan *goimap.Message, 50)
+	messages := make(chan *goimap.Message, pageSize)
 	fetchDone := make(chan error, 1)
 	go func() {
 		fetchDone <- c.Fetch(seqSet, items, messages)
@@ -158,7 +170,67 @@ func fetchEmailsForUser(email, password, folder string) ([]EmailMessage, []strin
 		emails[i], emails[j] = emails[j], emails[i]
 	}
 
-	return emails, folders, nil
+	return emails, folders, totalPages, nil
+}
+
+// fetchEmailHeaderByUID fetches envelope + flags for a single message by UID.
+func fetchEmailHeaderByUID(email, password, folder string, uid uint32) (*EmailMessage, error) {
+	c, err := client.Dial("localhost:143")
+	if err != nil {
+		return nil, fmt.Errorf("IMAP connection failed: %w", err)
+	}
+	defer c.Logout()
+
+	if err := c.Login(email, password); err != nil {
+		return nil, fmt.Errorf("IMAP login failed: %w", err)
+	}
+
+	if _, err := c.Select(folder, true); err != nil {
+		return nil, fmt.Errorf("folder %q not found: %w", folder, err)
+	}
+
+	seqSet := new(goimap.SeqSet)
+	seqSet.AddNum(uid)
+
+	items := []goimap.FetchItem{goimap.FetchUid, goimap.FetchEnvelope, goimap.FetchFlags}
+	messages := make(chan *goimap.Message, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- c.UidFetch(seqSet, items, messages)
+	}()
+
+	var em EmailMessage
+	for msg := range messages {
+		em.UID = msg.Uid
+		em.Date = time.Now()
+		if msg.Envelope != nil {
+			em.Subject = msg.Envelope.Subject
+			if msg.Envelope.Date != (time.Time{}) {
+				em.Date = msg.Envelope.Date
+			}
+			if len(msg.Envelope.From) > 0 && msg.Envelope.From[0] != nil {
+				addr := msg.Envelope.From[0]
+				if addr.PersonalName != "" {
+					em.From = fmt.Sprintf("%s <%s@%s>", addr.PersonalName, addr.MailboxName, addr.HostName)
+				} else {
+					em.From = fmt.Sprintf("%s@%s", addr.MailboxName, addr.HostName)
+				}
+			}
+		}
+		for _, flag := range msg.Flags {
+			if flag == goimap.SeenFlag {
+				em.Seen = true
+			}
+		}
+	}
+	if err := <-done; err != nil {
+		log.Printf("Portal: header fetch warning: %v", err)
+	}
+
+	if em.UID == 0 {
+		return nil, fmt.Errorf("message UID %d not found", uid)
+	}
+	return &em, nil
 }
 
 // fetchBodyForUser fetches the full body of a single message using the user's
@@ -347,6 +419,72 @@ func appendToSent(email, password string, rawMsg []byte) {
 	}
 }
 
+// deleteEmail moves a message to Trash. If the message is already in Trash it
+// is permanently deleted.
+func deleteEmail(email, password, folder string, uid uint32) error {
+	c, err := client.Dial("localhost:143")
+	if err != nil {
+		return fmt.Errorf("IMAP connection failed: %w", err)
+	}
+	defer c.Logout()
+
+	if err := c.Login(email, password); err != nil {
+		return fmt.Errorf("IMAP login failed: %w", err)
+	}
+
+	if _, err := c.Select(folder, false); err != nil {
+		return fmt.Errorf("select folder failed: %w", err)
+	}
+
+	seqSet := new(goimap.SeqSet)
+	seqSet.AddNum(uid)
+
+	if !strings.EqualFold(folder, "Trash") {
+		// Ensure Trash exists
+		if err := c.Create("Trash"); err != nil && !strings.Contains(err.Error(), "exist") {
+			log.Printf("Portal: create Trash failed: %v", err)
+		}
+		if err := c.UidCopy(seqSet, "Trash"); err != nil {
+			return fmt.Errorf("copy to Trash failed: %w", err)
+		}
+	}
+
+	item := goimap.FormatFlagsOp(goimap.AddFlags, true)
+	flags := []interface{}{goimap.DeletedFlag}
+	if err := c.UidStore(seqSet, item, flags, nil); err != nil {
+		return fmt.Errorf("mark deleted failed: %w", err)
+	}
+	return c.Expunge(nil)
+}
+
+// markEmailSeen sets or clears the \Seen flag on a message.
+func markEmailSeen(email, password, folder string, uid uint32, seen bool) error {
+	c, err := client.Dial("localhost:143")
+	if err != nil {
+		return fmt.Errorf("IMAP connection failed: %w", err)
+	}
+	defer c.Logout()
+
+	if err := c.Login(email, password); err != nil {
+		return fmt.Errorf("IMAP login failed: %w", err)
+	}
+
+	if _, err := c.Select(folder, false); err != nil {
+		return fmt.Errorf("select folder failed: %w", err)
+	}
+
+	seqSet := new(goimap.SeqSet)
+	seqSet.AddNum(uid)
+
+	op := goimap.AddFlags
+	if !seen {
+		op = goimap.RemoveFlags
+	}
+	item := goimap.FormatFlagsOp(op, true)
+	flags := []interface{}{goimap.SeenFlag}
+	return c.UidStore(seqSet, item, flags, nil)
+}
+
 // ---- Template rendering helpers --------------------------------------------
 
 func portalFuncMap() template.FuncMap {
@@ -363,6 +501,8 @@ func portalFuncMap() template.FuncMap {
 		"safeHTML": func(s string) template.HTML {
 			return template.HTML(s)
 		},
+		"inc": func(i int) int { return i + 1 },
+		"dec": func(i int) int { return i - 1 },
 	}
 }
 
@@ -501,6 +641,12 @@ func PortalHandler(cfg *config.Config) http.HandlerFunc {
 			portalCompose(w, r, cfg, sess)
 		case path == "/reply":
 			portalReply(w, r, cfg, sess)
+		case path == "/forward":
+			portalForward(w, r, cfg, sess)
+		case path == "/delete":
+			portalDelete(w, r, cfg, sess)
+		case path == "/mark":
+			portalMarkSeen(w, r, cfg, sess)
 		case path == "/credentials":
 			portalCredentials(w, r, cfg, sess)
 		default:
@@ -519,6 +665,8 @@ type portalInboxData struct {
 	Emails        []EmailMessage
 	SelectedEmail *EmailMessage
 	Error         string
+	Page          int
+	TotalPages    int
 }
 
 func portalInbox(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
@@ -528,15 +676,20 @@ func portalInbox(w http.ResponseWriter, r *http.Request, cfg *config.Config, ses
 		folder = "INBOX"
 	}
 	uidStr := q.Get("uid")
+	page, _ := strconv.Atoi(q.Get("page"))
+	if page < 1 {
+		page = 1
+	}
 
 	data := portalInboxData{
 		Domain:  cfg.Domain,
 		Email:   sess.Email,
 		Folder:  folder,
 		Folders: []string{"INBOX", "Sent", "Drafts", "Trash", "Junk"},
+		Page:    page,
 	}
 
-	emails, folders, err := fetchEmailsForUser(sess.Email, sess.Password, folder)
+	emails, folders, totalPages, err := fetchEmailsForUser(sess.Email, sess.Password, folder, page)
 	if err != nil {
 		data.Error = fmt.Sprintf("Failed to load mailbox: %v", err)
 		renderPortalTemplate(w, "portal_inbox.html", data)
@@ -544,6 +697,7 @@ func portalInbox(w http.ResponseWriter, r *http.Request, cfg *config.Config, ses
 	}
 
 	data.Emails = emails
+	data.TotalPages = totalPages
 	if len(folders) > 0 {
 		data.Folders = folders
 	}
@@ -655,21 +809,8 @@ func portalReply(w http.ResponseWriter, r *http.Request, cfg *config.Config, ses
 	}
 	uid := uint32(uid64)
 
-	// Fetch the original email headers + body
-	emails, _, err := fetchEmailsForUser(sess.Email, sess.Password, folder)
+	original, err := fetchEmailHeaderByUID(sess.Email, sess.Password, folder, uid)
 	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	var original *EmailMessage
-	for i := range emails {
-		if emails[i].UID == uid {
-			original = &emails[i]
-			break
-		}
-	}
-	if original == nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -688,6 +829,96 @@ func portalReply(w http.ResponseWriter, r *http.Request, cfg *config.Config, ses
 		Email:      sess.Email,
 		To:         replyTo,
 		Subject:    replySubject,
+		QuotedBody: body,
+	}
+	renderPortalTemplate(w, "portal_compose.html", data)
+}
+
+func portalDelete(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	folder := r.FormValue("folder")
+	if folder == "" {
+		folder = "INBOX"
+	}
+	uidStr := r.FormValue("uid")
+	uid64, err := strconv.ParseUint(uidStr, 10, 32)
+	if err != nil {
+		http.Redirect(w, r, "/inbox?folder="+folder, http.StatusSeeOther)
+		return
+	}
+
+	if err := deleteEmail(sess.Email, sess.Password, folder, uint32(uid64)); err != nil {
+		log.Printf("Portal: delete error for %s: %v", sess.Email, err)
+	}
+	http.Redirect(w, r, "/inbox?folder="+folder, http.StatusSeeOther)
+}
+
+func portalMarkSeen(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	folder := r.FormValue("folder")
+	if folder == "" {
+		folder = "INBOX"
+	}
+	uidStr := r.FormValue("uid")
+	uid64, err := strconv.ParseUint(uidStr, 10, 32)
+	if err != nil {
+		http.Redirect(w, r, "/inbox?folder="+folder, http.StatusSeeOther)
+		return
+	}
+	seen := r.FormValue("seen") == "true"
+
+	if err := markEmailSeen(sess.Email, sess.Password, folder, uint32(uid64), seen); err != nil {
+		log.Printf("Portal: mark seen error for %s: %v", sess.Email, err)
+	}
+	http.Redirect(w, r, "/inbox?folder="+folder+"&uid="+uidStr, http.StatusSeeOther)
+}
+
+func portalForward(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
+	q := r.URL.Query()
+	folder := q.Get("folder")
+	if folder == "" {
+		folder = "INBOX"
+	}
+	uidStr := q.Get("uid")
+	uid64, err := strconv.ParseUint(uidStr, 10, 32)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	uid := uint32(uid64)
+
+	original, err := fetchEmailHeaderByUID(sess.Email, sess.Password, folder, uid)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	body, _ := fetchBodyForUser(sess.Email, sess.Password, folder, uid)
+
+	fwdSubject := original.Subject
+	lower := strings.ToLower(fwdSubject)
+	if !strings.HasPrefix(lower, "fwd:") && !strings.HasPrefix(lower, "fw:") {
+		fwdSubject = "Fwd: " + fwdSubject
+	}
+
+	data := portalComposeData{
+		Domain:     cfg.Domain,
+		Email:      sess.Email,
+		Subject:    fwdSubject,
 		QuotedBody: body,
 	}
 	renderPortalTemplate(w, "portal_compose.html", data)

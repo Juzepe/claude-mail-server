@@ -35,7 +35,7 @@
             {{if .Emails}}
             <div class="email-list">
                 {{range .Emails}}
-                <a href="/inbox?folder={{$.Folder}}&uid={{.UID}}"
+                <a href="/inbox?folder={{$.Folder}}&uid={{.UID}}&page={{$.Page}}"
                    class="email-item {{if not .Seen}}email-unread{{end}} {{if and $.SelectedEmail (eq $.SelectedEmail.UID .UID)}}email-selected{{end}}">
                     <div class="email-sender">{{.From}}</div>
                     <div class="email-subject">{{if .Subject}}{{.Subject}}{{else}}(no subject){{end}}</div>
@@ -43,6 +43,21 @@
                 </a>
                 {{end}}
             </div>
+            {{if gt .TotalPages 1}}
+            <div class="pagination">
+                {{if gt .Page 1}}
+                <a href="/inbox?folder={{.Folder}}&page={{dec .Page}}" class="btn btn-secondary btn-sm">&#8592; Newer</a>
+                {{else}}
+                <span class="btn btn-secondary btn-sm disabled">&#8592; Newer</span>
+                {{end}}
+                <span class="pagination-info">{{.Page}} / {{.TotalPages}}</span>
+                {{if lt .Page .TotalPages}}
+                <a href="/inbox?folder={{.Folder}}&page={{inc .Page}}" class="btn btn-secondary btn-sm">Older &#8594;</a>
+                {{else}}
+                <span class="btn btn-secondary btn-sm disabled">Older &#8594;</span>
+                {{end}}
+            </div>
+            {{end}}
             {{else}}
             <div class="empty-state">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -86,6 +101,38 @@
                     </svg>
                     Reply
                 </a>
+                <a href="/forward?uid={{.SelectedEmail.UID}}&folder={{.Folder}}" class="btn btn-secondary btn-sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 17 20 12 15 7"/>
+                        <path d="M4 18v-2a4 4 0 0 1 4-4h12"/>
+                    </svg>
+                    Forward
+                </a>
+                <form method="POST" action="/mark" style="display:inline">
+                    <input type="hidden" name="uid" value="{{.SelectedEmail.UID}}">
+                    <input type="hidden" name="folder" value="{{.Folder}}">
+                    <input type="hidden" name="seen" value="{{if .SelectedEmail.Seen}}false{{else}}true{{end}}">
+                    <button type="submit" class="btn btn-secondary btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        {{if .SelectedEmail.Seen}}Mark unread{{else}}Mark read{{end}}
+                    </button>
+                </form>
+                <form method="POST" action="/delete" style="display:inline" onsubmit="return confirm('{{if eq .Folder "Trash"}}Permanently delete this email?{{else}}Move to Trash?{{end}}')">
+                    <input type="hidden" name="uid" value="{{.SelectedEmail.UID}}">
+                    <input type="hidden" name="folder" value="{{.Folder}}">
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6l-1 14H6L5 6"/>
+                            <path d="M10 11v6M14 11v6"/>
+                            <path d="M9 6V4h6v2"/>
+                        </svg>
+                        {{if eq .Folder "Trash"}}Delete permanently{{else}}Delete{{end}}
+                    </button>
+                </form>
             </div>
             <div class="email-body">
                 <pre class="email-body-text">{{.SelectedEmail.Body}}</pre>
