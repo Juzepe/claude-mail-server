@@ -1342,6 +1342,7 @@ type portalCredentialsData struct {
 	Email       string
 	SMTPHost    string
 	IMAPHost    string
+	WebmailURL  string
 	LaravelEnv  string
 	PHPExample  string
 	NodeExample string
@@ -1349,10 +1350,11 @@ type portalCredentialsData struct {
 
 func portalClients(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
 	data := portalCredentialsData{
-		Domain:   cfg.Domain,
-		Email:    sess.Email,
-		SMTPHost: cfg.Hostname,
-		IMAPHost: cfg.Hostname,
+		Domain:     cfg.Domain,
+		Email:      sess.Email,
+		SMTPHost:   cfg.Hostname,
+		IMAPHost:   cfg.Hostname,
+		WebmailURL: "https://webmail." + cfg.Domain,
 	}
 	renderPortalTemplate(w, "portal_clients.html", data)
 }

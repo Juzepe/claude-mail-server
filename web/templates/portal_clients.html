@@ -3,9 +3,37 @@
 {{define "page_title"}}Email Client Setup{{end}}
 
 {{define "content"}}
+<!-- Roundcube -->
+<div class="card mb-4" style="border-color:var(--accent)">
+    <div class="card-header" style="background:var(--accent-light)">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Roundcube Webmail
+            <span style="font-size:11px;font-weight:500;color:var(--accent);margin-left:8px;background:var(--accent-light);padding:2px 8px;border-radius:10px;border:1px solid var(--accent)">Recommended</span>
+        </h2>
+    </div>
+    <div class="card-body">
+        <p style="color:var(--text-secondary);margin-bottom:14px">Roundcube is a full-featured open-source webmail client installed on this server. It has search, HTML emails, address book, drag &amp; drop, and everything else you'd expect — no configuration needed.</p>
+        <a href="{{.WebmailURL}}" target="_blank" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            Open Roundcube — {{.WebmailURL}}
+        </a>
+        <div class="setup-note mt-3">
+            Log in with your email address <code class="inline-code">{{.Email}}</code> and your usual password.
+        </div>
+    </div>
+</div>
+
 <div class="card mb-4">
     <div class="card-body">
-        <p style="color:var(--text-secondary)">Use these settings to connect any email client to your mailbox. Your username is your full email address and your password is the same one you use to log in here.</p>
+        <p style="color:var(--text-secondary)">To connect a desktop or mobile client directly, use the settings below. Your username is your full email address and your password is the same one you use to log in here.</p>
         <div class="creds-grid mt-3" style="grid-template-columns:1fr 1fr;gap:12px">
             <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:14px">
                 <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px">Incoming (IMAP)</div>
