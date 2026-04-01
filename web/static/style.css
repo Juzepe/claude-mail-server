@@ -830,6 +830,15 @@ code.dns-value {
 .compose-field-toggles { float: right; font-weight: normal; }
 .compose-toggle-link { font-size: 0.75rem; color: var(--text-muted); margin-left: 8px; text-decoration: none; }
 .compose-toggle-link:hover { color: var(--accent); }
+.setup-steps { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: var(--text-secondary); font-size: 13px; }
+.setup-steps li { line-height: 1.6; }
+.setup-steps li strong { color: var(--text-primary); }
+.setup-note { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--text-secondary); }
+.setup-note strong { color: var(--text-primary); }
+.mb-4 { margin-bottom: 16px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.creds-table th { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 4px 12px 8px 0; font-weight: 600; }
 .pagination { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
 .pagination-info { font-size: 0.8rem; color: var(--text-secondary); flex: 1; text-align: center; }
 .btn.disabled { opacity: 0.4; pointer-events: none; }

@@ -901,6 +901,8 @@ func PortalHandler(cfg *config.Config) http.HandlerFunc {
 			portalStarred(w, r, cfg, sess)
 		case path == "/credentials":
 			portalCredentials(w, r, cfg, sess)
+		case path == "/clients":
+			portalClients(w, r, cfg, sess)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1343,6 +1345,16 @@ type portalCredentialsData struct {
 	LaravelEnv  string
 	PHPExample  string
 	NodeExample string
+}
+
+func portalClients(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {
+	data := portalCredentialsData{
+		Domain:   cfg.Domain,
+		Email:    sess.Email,
+		SMTPHost: cfg.Hostname,
+		IMAPHost: cfg.Hostname,
+	}
+	renderPortalTemplate(w, "portal_clients.html", data)
 }
 
 func portalCredentials(w http.ResponseWriter, r *http.Request, cfg *config.Config, sess *db.UserSession) {

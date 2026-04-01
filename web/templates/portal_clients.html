@@ -1,0 +1,231 @@
+{{define "title"}}Email Client Setup — {{.Domain}}{{end}}
+{{define "nav_clients"}}active{{end}}
+{{define "page_title"}}Email Client Setup{{end}}
+
+{{define "content"}}
+<div class="card mb-4">
+    <div class="card-body">
+        <p style="color:var(--text-secondary)">Use these settings to connect any email client to your mailbox. Your username is your full email address and your password is the same one you use to log in here.</p>
+        <div class="creds-grid mt-3" style="grid-template-columns:1fr 1fr;gap:12px">
+            <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:14px">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px">Incoming (IMAP)</div>
+                <div style="display:flex;flex-direction:column;gap:4px;font-size:13px">
+                    <div><span style="color:var(--text-secondary)">Host:</span> <code class="inline-code">{{.IMAPHost}}</code></div>
+                    <div><span style="color:var(--text-secondary)">Port:</span> <code class="inline-code">993</code> SSL/TLS &nbsp;or&nbsp; <code class="inline-code">143</code> STARTTLS</div>
+                    <div><span style="color:var(--text-secondary)">Username:</span> <code class="inline-code">{{.Email}}</code></div>
+                </div>
+            </div>
+            <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:14px">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px">Outgoing (SMTP)</div>
+                <div style="display:flex;flex-direction:column;gap:4px;font-size:13px">
+                    <div><span style="color:var(--text-secondary)">Host:</span> <code class="inline-code">{{.SMTPHost}}</code></div>
+                    <div><span style="color:var(--text-secondary)">Port:</span> <code class="inline-code">587</code> STARTTLS</div>
+                    <div><span style="color:var(--text-secondary)">Username:</span> <code class="inline-code">{{.Email}}</code></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Thunderbird -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+                <path d="M8 12l2 2 4-4"/>
+            </svg>
+            Mozilla Thunderbird
+        </h2>
+    </div>
+    <div class="card-body">
+        <ol class="setup-steps">
+            <li>Open Thunderbird. In the menu bar go to <strong>File → New → Existing Mail Account</strong> (or click <strong>Set Up an Existing Email Account</strong> on the home screen).</li>
+            <li>Enter your name, email address <code class="inline-code">{{.Email}}</code>, and password, then click <strong>Continue</strong>.</li>
+            <li>Thunderbird will try auto-detection. If it fails, click <strong>Configure manually</strong> and enter:</li>
+        </ol>
+        <table class="creds-table mt-3">
+            <thead><tr><th></th><th>Incoming (IMAP)</th><th>Outgoing (SMTP)</th></tr></thead>
+            <tbody>
+                <tr><td class="creds-key">Server</td><td><code class="inline-code">{{.IMAPHost}}</code></td><td><code class="inline-code">{{.SMTPHost}}</code></td></tr>
+                <tr><td class="creds-key">Port</td><td><code class="inline-code">993</code></td><td><code class="inline-code">587</code></td></tr>
+                <tr><td class="creds-key">Connection</td><td><code class="inline-code">SSL/TLS</code></td><td><code class="inline-code">STARTTLS</code></td></tr>
+                <tr><td class="creds-key">Auth method</td><td>Normal password</td><td>Normal password</td></tr>
+                <tr><td class="creds-key">Username</td><td><code class="inline-code">{{.Email}}</code></td><td><code class="inline-code">{{.Email}}</code></td></tr>
+            </tbody>
+        </table>
+        <ol class="setup-steps mt-3" start="4">
+            <li>Click <strong>Done</strong>. If you see a certificate warning, click <strong>Confirm Security Exception</strong> (expected for self-signed certificates).</li>
+            <li>Your inbox will appear in the left sidebar under your email address.</li>
+        </ol>
+    </div>
+</div>
+
+<!-- Outlook Desktop -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            Microsoft Outlook (Desktop)
+        </h2>
+    </div>
+    <div class="card-body">
+        <ol class="setup-steps">
+            <li>Open Outlook. Go to <strong>File → Add Account</strong>.</li>
+            <li>Enter your email address <code class="inline-code">{{.Email}}</code> and click <strong>Connect</strong>.</li>
+            <li>If Outlook fails auto-setup, select <strong>IMAP</strong> from the account type list and enter the incoming settings:</li>
+        </ol>
+        <table class="creds-table mt-3">
+            <tbody>
+                <tr><td class="creds-key">IMAP Server</td><td><code class="inline-code">{{.IMAPHost}}</code></td></tr>
+                <tr><td class="creds-key">IMAP Port</td><td><code class="inline-code">993</code> (SSL)</td></tr>
+                <tr><td class="creds-key">SMTP Server</td><td><code class="inline-code">{{.SMTPHost}}</code></td></tr>
+                <tr><td class="creds-key">SMTP Port</td><td><code class="inline-code">587</code> (STARTTLS)</td></tr>
+                <tr><td class="creds-key">Username</td><td><code class="inline-code">{{.Email}}</code></td></tr>
+            </tbody>
+        </table>
+        <ol class="setup-steps mt-3" start="4">
+            <li>Enter your password when prompted and click <strong>Connect</strong>.</li>
+            <li>If a certificate warning appears, click <strong>Accept</strong> or <strong>Yes</strong> to trust the server certificate.</li>
+            <li>Click <strong>Done</strong>. Your account will appear in the folder pane.</li>
+        </ol>
+        <div class="setup-note mt-3">
+            <strong>Outlook 365 / New Outlook:</strong> Go to <strong>Settings → Accounts → Add account → Other</strong> and fill in the same IMAP/SMTP settings above.
+        </div>
+    </div>
+</div>
+
+<!-- Apple Mail -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Apple Mail (macOS / iOS)
+        </h2>
+    </div>
+    <div class="card-body">
+        <div class="setup-platform-tabs">
+            <strong>macOS:</strong>
+        </div>
+        <ol class="setup-steps mt-2">
+            <li>Open Mail. Go to <strong>Mail → Add Account</strong> and select <strong>Other Mail Account…</strong>.</li>
+            <li>Enter your name, email <code class="inline-code">{{.Email}}</code>, and password. Click <strong>Sign In</strong>.</li>
+            <li>Mail will fail auto-discovery — fill in manually:</li>
+        </ol>
+        <table class="creds-table mt-3">
+            <tbody>
+                <tr><td class="creds-key">Account Type</td><td>IMAP</td></tr>
+                <tr><td class="creds-key">Incoming Server</td><td><code class="inline-code">{{.IMAPHost}}</code></td></tr>
+                <tr><td class="creds-key">Outgoing Server</td><td><code class="inline-code">{{.SMTPHost}}</code></td></tr>
+            </tbody>
+        </table>
+        <ol class="setup-steps mt-3" start="4">
+            <li>Click <strong>Sign In</strong>. If prompted about a certificate, click <strong>Connect</strong>.</li>
+        </ol>
+        <div class="setup-note mt-3">
+            <strong>iOS / iPadOS:</strong> Go to <strong>Settings → Mail → Accounts → Add Account → Other → Add Mail Account</strong>. Enter the same details and select IMAP when asked.
+        </div>
+    </div>
+</div>
+
+<!-- Gmail (fetch only) -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Gmail (fetch &amp; send as)
+        </h2>
+    </div>
+    <div class="card-body">
+        <p style="color:var(--text-secondary);margin-bottom:14px">Gmail can fetch your mail and let you send as your address. Note: Gmail fetches via POP3, not IMAP — emails are downloaded and removed from the server.</p>
+        <div style="font-weight:600;margin-bottom:6px">Step 1 — Fetch incoming mail (POP3)</div>
+        <ol class="setup-steps">
+            <li>In Gmail, go to <strong>Settings → See all settings → Accounts and Import</strong>.</li>
+            <li>Under <strong>Check mail from other accounts</strong>, click <strong>Add a mail account</strong>.</li>
+            <li>Enter <code class="inline-code">{{.Email}}</code> and click <strong>Next</strong>.</li>
+            <li>Choose <strong>Import emails from my other account (POP3)</strong> and click <strong>Next</strong>.</li>
+            <li>Fill in:</li>
+        </ol>
+        <table class="creds-table mt-2 mb-3">
+            <tbody>
+                <tr><td class="creds-key">POP Server</td><td><code class="inline-code">{{.IMAPHost}}</code></td></tr>
+                <tr><td class="creds-key">Port</td><td><code class="inline-code">995</code> (SSL)</td></tr>
+                <tr><td class="creds-key">Username</td><td><code class="inline-code">{{.Email}}</code></td></tr>
+            </tbody>
+        </table>
+        <ol class="setup-steps" start="6">
+            <li>Check <strong>Always use a secure connection (SSL)</strong>, then click <strong>Add Account</strong>.</li>
+        </ol>
+        <div style="font-weight:600;margin:14px 0 6px">Step 2 — Send as your address</div>
+        <ol class="setup-steps">
+            <li>Gmail will ask if you want to send mail as <code class="inline-code">{{.Email}}</code> — click <strong>Yes</strong>.</li>
+            <li>Fill in the SMTP details:</li>
+        </ol>
+        <table class="creds-table mt-2 mb-3">
+            <tbody>
+                <tr><td class="creds-key">SMTP Server</td><td><code class="inline-code">{{.SMTPHost}}</code></td></tr>
+                <tr><td class="creds-key">Port</td><td><code class="inline-code">587</code></td></tr>
+                <tr><td class="creds-key">Username</td><td><code class="inline-code">{{.Email}}</code></td></tr>
+                <tr><td class="creds-key">Connection</td><td>TLS</td></tr>
+            </tbody>
+        </table>
+        <ol class="setup-steps" start="3">
+            <li>Click <strong>Add Account</strong>. Gmail will send a confirmation code to your address — retrieve it from this webmail and paste it in.</li>
+        </ol>
+    </div>
+</div>
+
+<!-- Android (Gmail app) -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                <line x1="12" y1="18" x2="12.01" y2="18"/>
+            </svg>
+            Android (Gmail App)
+        </h2>
+    </div>
+    <div class="card-body">
+        <ol class="setup-steps">
+            <li>Open the Gmail app. Tap the menu (☰) → your profile picture → <strong>Add another account</strong>.</li>
+            <li>Select <strong>Other</strong> at the bottom of the list.</li>
+            <li>Enter <code class="inline-code">{{.Email}}</code> and tap <strong>Next</strong>. Choose <strong>Personal (IMAP)</strong>.</li>
+            <li>Enter your password and tap <strong>Next</strong>.</li>
+            <li>For the incoming server, verify or correct:</li>
+        </ol>
+        <table class="creds-table mt-2 mb-3">
+            <tbody>
+                <tr><td class="creds-key">Server</td><td><code class="inline-code">{{.IMAPHost}}</code></td></tr>
+                <tr><td class="creds-key">Port</td><td><code class="inline-code">993</code></td></tr>
+                <tr><td class="creds-key">Security</td><td>SSL/TLS</td></tr>
+            </tbody>
+        </table>
+        <ol class="setup-steps" start="6">
+            <li>For outgoing (SMTP) server:</li>
+        </ol>
+        <table class="creds-table mt-2 mb-3">
+            <tbody>
+                <tr><td class="creds-key">Server</td><td><code class="inline-code">{{.SMTPHost}}</code></td></tr>
+                <tr><td class="creds-key">Port</td><td><code class="inline-code">587</code></td></tr>
+                <tr><td class="creds-key">Security</td><td>STARTTLS</td></tr>
+            </tbody>
+        </table>
+        <ol class="setup-steps" start="7">
+            <li>Tap <strong>Next</strong> through any certificate warnings, then tap <strong>Next</strong> to finish.</li>
+        </ol>
+    </div>
+</div>
+
+<div class="copy-toast" id="copyToast">Copied!</div>
+{{end}}
