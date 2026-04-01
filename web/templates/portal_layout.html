@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{block "title" .}}Webmail{{end}}</title>
+    <title>{{block "title" .}}Portal{{end}}</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✉</text></svg>">
 </head>
@@ -23,61 +23,28 @@
             </div>
 
             <nav class="sidebar-nav">
-                <a href="/compose" class="nav-item {{block "nav_compose" .}}{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                    <span>Compose</span>
-                </a>
-
-                <div class="nav-section-label">Folders</div>
-
-                <a href="/inbox?folder=INBOX" class="nav-item {{block "nav_inbox" .}}{{end}}">
+                <a href="{{.WebmailURL}}" target="_blank" class="nav-item nav-item-primary">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                         <polyline points="22,6 12,13 2,6"/>
                     </svg>
-                    <span>Inbox</span>
-                </a>
-                <a href="/inbox?folder=Sent" class="nav-item {{block "nav_sent" .}}{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="22" y1="2" x2="11" y2="13"/>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    <span>Open Webmail</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto;opacity:0.5">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
-                    <span>Sent</span>
-                </a>
-                <a href="/inbox?folder=Drafts" class="nav-item {{block "nav_drafts" .}}{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                    <span>Drafts</span>
-                </a>
-                <a href="/inbox?folder=Junk" class="nav-item {{block "nav_junk" .}}{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-                    </svg>
-                    <span>Junk</span>
-                </a>
-                <a href="/inbox?folder=Trash" class="nav-item {{block "nav_trash" .}}{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6l-1 14H6L5 6"/>
-                        <path d="M10 11v6M14 11v6"/>
-                        <path d="M9 6V4h6v2"/>
-                    </svg>
-                    <span>Trash</span>
-                </a>
-                <a href="/starred" class="nav-item {{block "nav_starred" .}}{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                    </svg>
-                    <span>Starred</span>
                 </a>
 
                 <div class="nav-section-label">Settings</div>
+
+                <a href="/credentials" class="nav-item {{block "nav_credentials" .}}{{end}}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    <span>Credentials</span>
+                </a>
 
                 <a href="/clients" class="nav-item {{block "nav_clients" .}}{{end}}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -86,14 +53,6 @@
                         <line x1="12" y1="17" x2="12" y2="21"/>
                     </svg>
                     <span>Email Clients</span>
-                </a>
-                <a href="/credentials" class="nav-item {{block "nav_credentials" .}}{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                        <line x1="8" y1="21" x2="16" y2="21"/>
-                        <line x1="12" y1="17" x2="12" y2="21"/>
-                    </svg>
-                    <span>Credentials</span>
                 </a>
             </nav>
 
@@ -114,7 +73,6 @@
 
         <!-- Main content -->
         <div class="main-wrapper">
-            <!-- Top bar -->
             <header class="topbar">
                 <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle menu">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -123,13 +81,12 @@
                         <line x1="3" y1="18" x2="21" y2="18"/>
                     </svg>
                 </button>
-                <div class="topbar-title">{{block "page_title" .}}Inbox{{end}}</div>
+                <div class="topbar-title">{{block "page_title" .}}Portal{{end}}</div>
                 <div class="topbar-right">
                     <span class="topbar-domain">{{.Email}}</span>
                 </div>
             </header>
 
-            <!-- Page content -->
             <main class="content">
                 {{block "content" .}}{{end}}
             </main>

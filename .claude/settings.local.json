@@ -29,7 +29,10 @@
       "Bash(sed -i 's|http.Redirect\\(w, r, \"\"/portal/\"\", http.StatusSeeOther\\)|http.Redirect\\(w, r, \"\"/\"\", http.StatusSeeOther\\)|g' \"/home/juzepe/Projects/claude/mail server/web/handlers/portal.go\")",
       "Bash(go version:*)",
       "Bash(grep \"bin/go$\")",
-      "Bash(/tmp/go/bin/go version:*)"
+      "Bash(/tmp/go/bin/go version:*)",
+      "Bash(systemctl show:*)",
+      "Bash(sudo /usr/local/go/bin/go build -o /usr/local/bin/mailserver-web .)",
+      "Bash(/usr/local/go/bin/go build:*)"
     ]
   }
 }

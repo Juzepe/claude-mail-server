@@ -18,6 +18,7 @@ type Config struct {
 	MailDir             string
 	DovecotUsersFile    string
 	PostfixVmailboxFile string
+	ListenAddr          string // HTTP listen address, e.g. 127.0.0.1:8080 (nginx handles TLS)
 }
 
 const defaultConfigPath = "/etc/mailserver/config.env"
@@ -67,6 +68,10 @@ func Load() *Config {
 		cfg.PortalHostname = "portal." + cfg.Domain
 	}
 
+	if cfg.ListenAddr == "" {
+		cfg.ListenAddr = "127.0.0.1:8080"
+	}
+
 	return cfg
 }
 
@@ -110,6 +115,7 @@ func (c *Config) applyEnv() {
 		"MAIL_DIR":              &c.MailDir,
 		"DOVECOT_USERS_FILE":    &c.DovecotUsersFile,
 		"POSTFIX_VMAILBOX_FILE": &c.PostfixVmailboxFile,
+		"LISTEN_ADDR":           &c.ListenAddr,
 	}
 	for key, ptr := range envVars {
 		if v := os.Getenv(key); v != "" {
@@ -138,5 +144,7 @@ func (c *Config) set(key, value string) {
 		c.DovecotUsersFile = value
 	case "POSTFIX_VMAILBOX_FILE":
 		c.PostfixVmailboxFile = value
+	case "LISTEN_ADDR":
+		c.ListenAddr = value
 	}
 }

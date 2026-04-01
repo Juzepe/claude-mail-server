@@ -141,6 +141,13 @@ button { cursor: pointer; font-family: var(--font); }
     background: var(--accent-light);
     color: var(--accent);
 }
+.nav-item-primary {
+    background: var(--accent);
+    color: #fff !important;
+    border-radius: var(--radius-sm);
+    margin-bottom: 4px;
+}
+.nav-item-primary:hover { background: var(--accent-hover) !important; color: #fff !important; }
 .nav-item svg { flex-shrink: 0; }
 
 .sidebar-footer {

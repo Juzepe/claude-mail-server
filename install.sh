@@ -40,8 +40,8 @@ info "Detected OS: $PRETTY_NAME"
 # --- Banner ---
 echo -e "${BLUE}"
 echo "  ╔══════════════════════════════════════════╗"
-echo "  ║       Mail Server Installer v1.0         ║"
-echo "  ║  Postfix + Dovecot + OpenDKIM + Web UI   ║"
+echo "  ║       Mail Server Installer v2.0         ║"
+echo "  ║  Postfix + Dovecot + Roundcube + Nginx   ║"
 echo "  ╚══════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -102,18 +102,24 @@ apt-get install -y -q \
     dovecot-lmtpd \
     opendkim \
     opendkim-tools \
+    nginx \
     certbot \
+    python3-certbot-nginx \
     git \
     make \
     curl \
     wget \
     apache2-utils \
-    python3-certbot \
     ca-certificates \
     openssl \
     mailutils \
     dnsutils \
     2>/dev/null || true
+
+# PHP + Roundcube
+apt-get install -y -q php-fpm php-xml php-mbstring php-intl php-zip php-json 2>/dev/null || true
+apt-get install -y -q roundcube roundcube-sqlite3 2>/dev/null || \
+    apt-get install -y -q roundcube 2>/dev/null || true
 
 success "Packages installed."
 
@@ -263,6 +269,7 @@ DATA_DIR=/var/lib/mailserver
 MAIL_DIR=/var/mail/vhosts
 DOVECOT_USERS_FILE=/etc/dovecot/users
 POSTFIX_VMAILBOX_FILE=/etc/postfix/vmailbox
+LISTEN_ADDR=127.0.0.1:8080
 EOF
 chmod 600 /etc/mailserver/config.env
 success "Config written to /etc/mailserver/config.env"
@@ -351,44 +358,50 @@ usermod -aG postfix opendkim 2>/dev/null || true
 
 success "OpenDKIM configured."
 
-# --- SSL Certificate ---
-step "Obtaining SSL certificate"
+# --- SSL Certificates ---
+step "Obtaining SSL certificates (mail, portal, webmail)"
 
+SERVER_IP=$(curl -s4 --max-time 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 CERT_DIR="/etc/letsencrypt/live/${MAIL_HOSTNAME}"
+WEBMAIL_HOSTNAME="webmail.${DOMAIN}"
+PORTAL_HOSTNAME_FQDN="portal.${DOMAIN}"
 
-if [[ -f "${CERT_DIR}/fullchain.pem" ]]; then
-    success "Certificate for ${MAIL_HOSTNAME} already exists, skipping certbot."
-else
-    # Verify DNS resolves to this server before attempting certbot
-    SERVER_IP=$(curl -s4 --max-time 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
-    DNS_IP=$(dig +short "${MAIL_HOSTNAME}" 2>/dev/null | tail -1)
-
-    info "Server IP:  ${SERVER_IP}"
-    info "DNS IP:     ${DNS_IP:-not found}"
-
+# Check DNS for all three subdomains
+for SUBDOMAIN in "${MAIL_HOSTNAME}" "${PORTAL_HOSTNAME_FQDN}" "${WEBMAIL_HOSTNAME}"; do
+    DNS_IP=$(dig +short "${SUBDOMAIN}" 2>/dev/null | tail -1)
+    info "DNS check ${SUBDOMAIN}: ${DNS_IP:-not found}"
     if [[ -z "$DNS_IP" ]]; then
-        error "DNS A record for ${MAIL_HOSTNAME} not found. Add an A record pointing to ${SERVER_IP} and re-run the installer."
+        error "DNS A record for ${SUBDOMAIN} not found. Add an A record pointing to ${SERVER_IP} and re-run the installer."
     fi
-
     if [[ "$DNS_IP" != "$SERVER_IP" ]]; then
-        error "DNS A record for ${MAIL_HOSTNAME} points to ${DNS_IP}, but this server's IP is ${SERVER_IP}. Fix the A record and re-run the installer."
+        error "DNS A record for ${SUBDOMAIN} points to ${DNS_IP}, but this server is ${SERVER_IP}. Fix the DNS record and re-run."
     fi
+done
 
-    # Stop any service that might occupy port 80
-    systemctl disable --now apache2 nginx 2>/dev/null || true
-    systemctl stop mailserver-web 2>/dev/null || true
+# Stop services that use port 80
+systemctl stop nginx 2>/dev/null || true
+systemctl stop mailserver-web 2>/dev/null || true
+systemctl disable --now apache2 2>/dev/null || true
 
-    if ! certbot certonly \
-        --standalone \
-        -d "${MAIL_HOSTNAME}" \
-        --agree-tos \
+# Get/expand cert to cover all three subdomains
+if [[ -f "${CERT_DIR}/fullchain.pem" ]]; then
+    info "Expanding existing certificate to include all subdomains..."
+    certbot certonly \
+        --standalone --expand --non-interactive --agree-tos \
         --email "${ADMIN_EMAIL}" \
-        --non-interactive; then
-        error "certbot failed to obtain a certificate for ${MAIL_HOSTNAME}. Check that port 80 is open and DNS is correct."
-    fi
-
-    success "SSL certificate obtained: ${CERT_DIR}"
+        -d "${MAIL_HOSTNAME}" \
+        -d "${PORTAL_HOSTNAME_FQDN}" \
+        -d "${WEBMAIL_HOSTNAME}" || warn "certbot expand failed — using existing cert"
+else
+    certbot certonly \
+        --standalone --non-interactive --agree-tos \
+        --email "${ADMIN_EMAIL}" \
+        -d "${MAIL_HOSTNAME}" \
+        -d "${PORTAL_HOSTNAME_FQDN}" \
+        -d "${WEBMAIL_HOSTNAME}" || error "certbot failed. Check DNS and that port 80 is open."
 fi
+
+success "SSL certificate ready: ${CERT_DIR}"
 
 # Write cert paths into postfix and dovecot configs
 sed -i "s|{{CERT_DIR}}|${CERT_DIR}|g" /etc/postfix/main.cf
@@ -404,6 +417,177 @@ sed \
 
 systemctl daemon-reload
 success "Systemd service installed."
+
+# --- Configure Roundcube ---
+step "Configuring Roundcube"
+
+# Find PHP-FPM socket
+PHP_FPM_SOCK=$(find /var/run/php -name "php*-fpm.sock" 2>/dev/null | head -1)
+if [[ -z "$PHP_FPM_SOCK" ]]; then
+    # Start php-fpm to create the socket
+    systemctl start php*-fpm 2>/dev/null || true
+    sleep 2
+    PHP_FPM_SOCK=$(find /var/run/php -name "php*-fpm.sock" 2>/dev/null | head -1)
+fi
+if [[ -z "$PHP_FPM_SOCK" ]]; then
+    PHP_FPM_SOCK="/var/run/php/php-fpm.sock"
+    warn "Could not detect PHP-FPM socket, using default: ${PHP_FPM_SOCK}"
+fi
+info "PHP-FPM socket: ${PHP_FPM_SOCK}"
+
+# Generate a random 24-char DES key for Roundcube
+RC_DES_KEY=$(openssl rand -base64 18 | tr -d '+/=' | head -c 24)
+
+# Write Roundcube config
+mkdir -p /etc/roundcube
+cat > /etc/roundcube/config.inc.php << EOF
+<?php
+\$config['db_dsnw'] = 'sqlite:////var/lib/roundcube/db/sqlite.db?mode=0640';
+\$config['imap_host'] = 'localhost:143';
+\$config['smtp_host'] = 'localhost:587';
+\$config['smtp_user'] = '%u';
+\$config['smtp_pass'] = '%p';
+\$config['des_key'] = '${RC_DES_KEY}';
+\$config['default_host'] = 'localhost';
+\$config['product_name'] = 'Webmail';
+\$config['smtp_conn_options'] = [
+    'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+];
+\$config['imap_conn_options'] = [
+    'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+];
+EOF
+chmod 640 /etc/roundcube/config.inc.php
+
+# Ensure Roundcube SQLite DB directory exists with correct ownership
+ROUNDCUBE_DB_DIR="/var/lib/roundcube/db"
+mkdir -p "${ROUNDCUBE_DB_DIR}"
+chown -R www-data:www-data /var/lib/roundcube 2>/dev/null || true
+
+# Find Roundcube document root
+if [[ -f /usr/share/roundcube/index.php ]]; then
+    RC_ROOT="/usr/share/roundcube"
+elif [[ -f /var/lib/roundcube/index.php ]]; then
+    RC_ROOT="/var/lib/roundcube"
+else
+    RC_ROOT="/usr/share/roundcube"
+    warn "Could not detect Roundcube document root, using ${RC_ROOT}"
+fi
+info "Roundcube root: ${RC_ROOT}"
+
+# Link Roundcube config into its config dir if needed
+if [[ -d "${RC_ROOT}/config" && ! -f "${RC_ROOT}/config/config.inc.php" ]]; then
+    ln -sf /etc/roundcube/config.inc.php "${RC_ROOT}/config/config.inc.php" 2>/dev/null || true
+fi
+
+success "Roundcube configured."
+
+# --- Configure nginx ---
+step "Configuring nginx"
+
+# Disable default site
+rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+
+# Write nginx config for all three subdomains
+cat > /etc/nginx/sites-available/mailserver << NGINXEOF
+# HTTP → HTTPS redirect
+server {
+    listen 80;
+    server_name ${MAIL_HOSTNAME} ${PORTAL_HOSTNAME_FQDN} ${WEBMAIL_HOSTNAME};
+    return 301 https://\$host\$request_uri;
+}
+
+# Admin panel — ${MAIL_HOSTNAME}
+server {
+    listen 443 ssl http2;
+    server_name ${MAIL_HOSTNAME};
+
+    ssl_certificate     ${CERT_DIR}/fullchain.pem;
+    ssl_certificate_key ${CERT_DIR}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    add_header Strict-Transport-Security "max-age=63072000" always;
+
+    location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 60s;
+    }
+}
+
+# User portal — ${PORTAL_HOSTNAME_FQDN}
+server {
+    listen 443 ssl http2;
+    server_name ${PORTAL_HOSTNAME_FQDN};
+
+    ssl_certificate     ${CERT_DIR}/fullchain.pem;
+    ssl_certificate_key ${CERT_DIR}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    add_header Strict-Transport-Security "max-age=63072000" always;
+
+    location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 60s;
+    }
+}
+
+# Roundcube webmail — ${WEBMAIL_HOSTNAME}
+server {
+    listen 443 ssl http2;
+    server_name ${WEBMAIL_HOSTNAME};
+
+    ssl_certificate     ${CERT_DIR}/fullchain.pem;
+    ssl_certificate_key ${CERT_DIR}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    add_header Strict-Transport-Security "max-age=63072000" always;
+
+    root  ${RC_ROOT};
+    index index.php;
+
+    client_max_body_size 25M;
+
+    location / {
+        try_files \$uri \$uri/ /index.php;
+    }
+
+    location ~ \.php\$ {
+        include         snippets/fastcgi-php.conf;
+        fastcgi_pass    unix:${PHP_FPM_SOCK};
+        fastcgi_param   SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include         fastcgi_params;
+    }
+
+    # Block sensitive paths
+    location ~ ^/(config|temp|logs)/ { deny all; }
+    location ~ /\.                   { deny all; }
+    location = /README.md            { deny all; }
+    location = /CHANGELOG.md         { deny all; }
+}
+NGINXEOF
+
+ln -sf /etc/nginx/sites-available/mailserver /etc/nginx/sites-enabled/mailserver
+
+# Test and start nginx
+nginx -t && systemctl enable nginx && systemctl start nginx || warn "nginx config test failed — check /etc/nginx/sites-available/mailserver"
+
+success "nginx configured and started."
 
 # --- Configure firewall ---
 step "Configuring firewall (ufw)"
@@ -427,16 +611,17 @@ fi
 # --- Enable and start services ---
 step "Starting services"
 
-systemctl enable postfix dovecot opendkim mailserver-web 2>/dev/null || true
-systemctl restart opendkim  || warn "opendkim failed to start"
-systemctl restart dovecot   || warn "dovecot failed to start"
-systemctl restart postfix   || warn "postfix failed to start"
-systemctl start  mailserver-web || warn "mailserver-web failed to start"
+systemctl enable postfix dovecot opendkim mailserver-web nginx 2>/dev/null || true
+systemctl restart opendkim      || warn "opendkim failed to start"
+systemctl restart dovecot       || warn "dovecot failed to start"
+systemctl restart postfix       || warn "postfix failed to start"
+systemctl restart mailserver-web || warn "mailserver-web failed to start"
+systemctl restart nginx         || warn "nginx failed to start"
 
 sleep 2
 
 # Status check
-for svc in postfix dovecot opendkim mailserver-web; do
+for svc in postfix dovecot opendkim mailserver-web nginx; do
     if systemctl is-active --quiet "$svc"; then
         success "$svc is running"
     else
@@ -463,16 +648,19 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║              INSTALLATION COMPLETE!                             ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}"
 echo
-echo -e "${WHITE}Web UI:${NC}  https://${MAIL_HOSTNAME}"
-echo -e "${WHITE}Portal:${NC}  https://portal.${DOMAIN}"
-echo -e "${WHITE}Login:${NC}   ${ADMIN_EMAIL} / (your password)"
+FINAL_IP=$(curl -s4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+echo -e "${WHITE}Admin panel:${NC}  https://${MAIL_HOSTNAME}"
+echo -e "${WHITE}User portal:${NC}  https://portal.${DOMAIN}"
+echo -e "${WHITE}Webmail:${NC}      https://webmail.${DOMAIN}"
+echo -e "${WHITE}Login:${NC}        ${ADMIN_EMAIL} / (your password)"
 echo
 echo -e "${YELLOW}=== DNS Records to configure ===${NC}"
 echo -e "${WHITE}Type  Name                   Value${NC}"
 echo -e "────  ─────────────────────  ─────────────────────────────────"
 echo -e "MX    @                      ${MAIL_HOSTNAME} (priority 10)"
-echo -e "A     mail                   $(curl -s4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
-echo -e "A     portal                 $(curl -s4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+echo -e "A     mail                   ${FINAL_IP}"
+echo -e "A     portal                 ${FINAL_IP}"
+echo -e "A     webmail                ${FINAL_IP}"
 echo -e "TXT   @                      v=spf1 mx a:${MAIL_HOSTNAME} ~all"
 echo -e "TXT   mail._domainkey        v=DKIM1; k=rsa; p=${DKIM_PUBLIC}"
 echo -e "TXT   _dmarc                 v=DMARC1; p=quarantine; rua=mailto:postmaster@${DOMAIN}"
@@ -483,7 +671,8 @@ echo -e "SMTP Port:        587 (STARTTLS)"
 echo -e "IMAP Host:        ${MAIL_HOSTNAME} (or ${DOMAIN})"
 echo -e "IMAP Port:        993 (SSL/TLS)"
 echo
-echo -e "${CYAN}Manage email accounts at: https://${MAIL_HOSTNAME}${NC}"
+echo -e "${CYAN}Manage email accounts at:  https://${MAIL_HOSTNAME}${NC}"
+echo -e "${CYAN}Webmail (Roundcube) at:    https://webmail.${DOMAIN}${NC}"
 echo -e "${CYAN}Config file: /etc/mailserver/config.env${NC}"
 echo
 echo -e "${YELLOW}NOTE:${NC} Set DNS records above BEFORE sending/receiving mail."

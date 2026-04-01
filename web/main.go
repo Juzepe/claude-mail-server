@@ -1,7 +1,6 @@
 package main
 
 import (
-	"golang.org/x/crypto/bcrypt"
 	"flag"
 	"fmt"
 	"log"
@@ -10,13 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"mailserver/config"
 	"mailserver/db"
 	"mailserver/handlers"
 	"mailserver/mail"
 	"mailserver/middleware"
-
-	"golang.org/x/crypto/acme/autocert"
 )
 
 func main() {
@@ -58,17 +57,16 @@ func main() {
 	}
 	defer db.Close()
 
-	log.Printf("Starting mailserver web UI at https://%s", cfg.Hostname)
-	log.Printf("User portal at https://%s", cfg.PortalHostname)
+	log.Printf("Starting mailserver web UI (admin: %s, portal: %s)", cfg.Hostname, cfg.PortalHostname)
+	log.Printf("Listening on %s (nginx handles TLS)", cfg.ListenAddr)
 
 	// Static files directory
 	staticDir := "/opt/mailserver/web/static"
 	if _, err := os.Stat(staticDir); os.IsNotExist(err) {
-		// Fallback to local directory for development
 		staticDir = "./static"
 	}
 
-	// Admin mux — existing admin panel routes
+	// Admin mux
 	adminMux := http.NewServeMux()
 	adminMux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
 	adminMux.HandleFunc("/login", handlers.Login(cfg))
@@ -82,7 +80,7 @@ func main() {
 	adminMux.Handle("/credentials", auth(handlers.Credentials(cfg)))
 	adminMux.Handle("/dns", auth(handlers.DNS(cfg)))
 
-	// Portal mux — user webmail routes (no /portal/ prefix)
+	// Portal mux
 	portalMux := http.NewServeMux()
 	portalMux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
 	portalMux.HandleFunc("/login", handlers.PortalLogin(cfg))
@@ -96,55 +94,23 @@ func main() {
 		if i := strings.LastIndex(host, ":"); i != -1 {
 			host = host[:i]
 		}
-if host == portalHost {
+		if host == portalHost {
 			portalMux.ServeHTTP(w, r)
 		} else {
 			adminMux.ServeHTTP(w, r)
 		}
 	})
 
-	// HTTP -> HTTPS redirect + ACME challenge handler
-	certManager := &autocert.Manager{
-		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(cfg.Hostname, cfg.PortalHostname),
-		Cache:      autocert.DirCache(cfg.DataDir + "/certs"),
-		Email:      cfg.AdminEmail,
-	}
-
-	httpServer := &http.Server{
-		Addr:         ":80",
-		Handler:      certManager.HTTPHandler(redirectHTTPS()),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
-	httpsServer := &http.Server{
-		Addr:         ":443",
+	server := &http.Server{
+		Addr:         cfg.ListenAddr,
 		Handler:      router,
-		TLSConfig:    certManager.TLSConfig(),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Start HTTP server in background
-	go func() {
-		log.Println("HTTP server listening on :80 (redirect to HTTPS)")
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("HTTP server error: %v", err)
-		}
-	}()
-
-	log.Println("HTTPS server listening on :443")
-	if err := httpsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("HTTPS server error: %v", err)
+	log.Printf("HTTP server listening on %s", cfg.ListenAddr)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Server error: %v", err)
 	}
-}
-
-func redirectHTTPS() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		target := "https://" + r.Host + r.URL.RequestURI()
-		http.Redirect(w, r, target, http.StatusMovedPermanently)
-	})
 }
