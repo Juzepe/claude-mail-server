@@ -135,7 +135,7 @@
     </div>
 </div>
 
-<!-- Gmail (fetch only) -->
+<!-- Gmail web note -->
 <div class="card mb-4">
     <div class="card-header">
         <h2 class="card-title">
@@ -143,45 +143,19 @@
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                 <polyline points="22,6 12,13 2,6"/>
             </svg>
-            Gmail (fetch &amp; send as)
+            Gmail Web
         </h2>
     </div>
     <div class="card-body">
-        <p style="color:var(--text-secondary);margin-bottom:14px">Gmail can fetch your mail and let you send as your address. Note: Gmail fetches via POP3, not IMAP — emails are downloaded and removed from the server.</p>
-        <div style="font-weight:600;margin-bottom:6px">Step 1 — Fetch incoming mail (POP3)</div>
-        <ol class="setup-steps">
-            <li>In Gmail, go to <strong>Settings → See all settings → Accounts and Import</strong>.</li>
-            <li>Under <strong>Check mail from other accounts</strong>, click <strong>Add a mail account</strong>.</li>
-            <li>Enter <code class="inline-code">{{.Email}}</code> and click <strong>Next</strong>.</li>
-            <li>Choose <strong>Import emails from my other account (POP3)</strong> and click <strong>Next</strong>.</li>
-            <li>Fill in:</li>
-        </ol>
-        <table class="creds-table mt-2 mb-3">
-            <tbody>
-                <tr><td class="creds-key">POP Server</td><td><code class="inline-code">{{.IMAPHost}}</code></td></tr>
-                <tr><td class="creds-key">Port</td><td><code class="inline-code">995</code> (SSL)</td></tr>
-                <tr><td class="creds-key">Username</td><td><code class="inline-code">{{.Email}}</code></td></tr>
-            </tbody>
-        </table>
-        <ol class="setup-steps" start="6">
-            <li>Check <strong>Always use a secure connection (SSL)</strong>, then click <strong>Add Account</strong>.</li>
-        </ol>
-        <div style="font-weight:600;margin:14px 0 6px">Step 2 — Send as your address</div>
-        <ol class="setup-steps">
-            <li>Gmail will ask if you want to send mail as <code class="inline-code">{{.Email}}</code> — click <strong>Yes</strong>.</li>
-            <li>Fill in the SMTP details:</li>
-        </ol>
-        <table class="creds-table mt-2 mb-3">
-            <tbody>
-                <tr><td class="creds-key">SMTP Server</td><td><code class="inline-code">{{.SMTPHost}}</code></td></tr>
-                <tr><td class="creds-key">Port</td><td><code class="inline-code">587</code></td></tr>
-                <tr><td class="creds-key">Username</td><td><code class="inline-code">{{.Email}}</code></td></tr>
-                <tr><td class="creds-key">Connection</td><td>TLS</td></tr>
-            </tbody>
-        </table>
-        <ol class="setup-steps" start="3">
-            <li>Click <strong>Add Account</strong>. Gmail will send a confirmation code to your address — retrieve it from this webmail and paste it in.</li>
-        </ol>
+        <div class="setup-note">
+            <strong>Gmail web does not support separate accounts.</strong> The "Check mail from other accounts" feature in Gmail settings merges all fetched emails into your personal Gmail inbox — there is no way to keep them separate in the Gmail web interface.<br><br>
+            For a separate account experience use one of these instead:
+            <ul style="margin-top:8px;padding-left:18px;display:flex;flex-direction:column;gap:4px">
+                <li><strong>Android / iOS:</strong> Use the Gmail app — it supports multiple fully separate accounts you switch between (see section below).</li>
+                <li><strong>Desktop:</strong> Use Thunderbird or Outlook — both show each account as a completely separate inbox.</li>
+                <li><strong>Browser:</strong> Use this webmail portal directly.</li>
+            </ul>
+        </div>
     </div>
 </div>
 
