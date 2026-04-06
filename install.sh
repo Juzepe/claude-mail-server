@@ -444,17 +444,26 @@ cat > /etc/roundcube/config.inc.php << EOF
 <?php
 \$config['db_dsnw'] = 'sqlite:////var/lib/roundcube/db/sqlite.db?mode=0640';
 \$config['imap_host'] = 'localhost:143';
-\$config['smtp_host'] = 'localhost:587';
+\$config['smtp_host'] = 'tls://localhost';
+\$config['smtp_port'] = 587;
 \$config['smtp_user'] = '%u';
 \$config['smtp_pass'] = '%p';
 \$config['des_key'] = '${RC_DES_KEY}';
 \$config['default_host'] = 'localhost';
 \$config['product_name'] = 'Webmail';
 \$config['smtp_conn_options'] = [
-    'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+    'ssl' => [
+        'verify_peer'       => false,
+        'verify_peer_name'  => false,
+        'allow_self_signed' => true,
+    ],
 ];
 \$config['imap_conn_options'] = [
-    'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+    'ssl' => [
+        'verify_peer'       => false,
+        'verify_peer_name'  => false,
+        'allow_self_signed' => true,
+    ],
 ];
 EOF
 chmod 640 /etc/roundcube/config.inc.php
