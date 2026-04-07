@@ -469,26 +469,22 @@ cat > /etc/roundcube/config.inc.php << EOF
 EOF
 chmod 640 /etc/roundcube/config.inc.php
 
-# --- Install Roundcube password plugin ---
+# --- Install Roundcube password plugin via composer ---
 step "Installing Roundcube password plugin"
 
-if [[ ! -f /usr/share/roundcube/composer.json ]]; then
-    warn "Roundcube composer.json not found, skipping password plugin install."
-else
-    # Install composer if not present
-    if ! command -v composer &>/dev/null; then
-        info "Installing composer..."
-        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-    fi
+# Install composer if not present
+if ! command -v composer &>/dev/null; then
+    info "Installing composer..."
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    success "Composer installed."
+fi
 
-    cd /usr/share/roundcube
-    COMPOSER_ALLOW_SUPERUSER=1 composer require --no-interaction \
-        roundcube/plugin-installer \
-        roundcube/password 2>/dev/null || warn "composer install of password plugin failed"
+cd /usr/share/roundcube
+COMPOSER_ALLOW_SUPERUSER=1 composer require --no-interaction roundcube/plugin-installer roundcube/password \
+    || warn "composer install of password plugin failed"
 
-    # Write password plugin config pointing to Dovecot passwd-file
-    mkdir -p /usr/share/roundcube/plugins/password
-    cat > /usr/share/roundcube/plugins/password/config.inc.php << 'PWEOF'
+# Write password plugin config
+cat > /usr/share/roundcube/plugins/password/config.inc.php << 'PWEOF'
 <?php
 $config['password_driver'] = 'dovecotpasswd';
 $config['password_dovecotpasswd_file'] = '/etc/dovecot/users';
@@ -496,9 +492,8 @@ $config['password_minimum_length'] = 8;
 $config['password_confirm_current'] = true;
 PWEOF
 
-    chown -R www-data:www-data /usr/share/roundcube/plugins/password 2>/dev/null || true
-    success "Roundcube password plugin installed."
-fi
+chown -R www-data:www-data /usr/share/roundcube/plugins/password 2>/dev/null || true
+success "Roundcube password plugin installed."
 
 # Ensure Roundcube SQLite DB directory exists with correct ownership
 ROUNDCUBE_DB_DIR="/var/lib/roundcube/db"
