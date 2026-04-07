@@ -469,31 +469,54 @@ cat > /etc/roundcube/config.inc.php << EOF
 EOF
 chmod 640 /etc/roundcube/config.inc.php
 
-# --- Install Roundcube password plugin via composer ---
+# --- Install Roundcube password plugin ---
 step "Installing Roundcube password plugin"
 
-# Install composer if not present
-if ! command -v composer &>/dev/null; then
-    info "Installing composer..."
-    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-    success "Composer installed."
+RC_PASSWORD_DIR="/usr/share/roundcube/plugins/password"
+
+if [[ ! -f "${RC_PASSWORD_DIR}/password.php" ]]; then
+    # Get installed Roundcube version
+    RC_VERSION=$(dpkg -l roundcube-core 2>/dev/null | awk '/^ii/{print $3}' | cut -d: -f2 | cut -d+ -f1)
+    if [[ -z "$RC_VERSION" ]]; then
+        RC_VERSION=$(dpkg -l roundcube 2>/dev/null | awk '/^ii/{print $3}' | cut -d: -f2 | cut -d+ -f1)
+    fi
+    if [[ -z "$RC_VERSION" ]]; then
+        RC_VERSION="1.6.9"
+        warn "Could not detect Roundcube version, using ${RC_VERSION}"
+    fi
+    info "Roundcube version: ${RC_VERSION} — downloading password plugin..."
+
+    TMPDIR_RC=$(mktemp -d)
+    wget -q "https://github.com/roundcube/roundcubemail/releases/download/${RC_VERSION}/roundcubemail-${RC_VERSION}-complete.tar.gz" \
+        -O "${TMPDIR_RC}/rc.tar.gz" || \
+    wget -q "https://github.com/roundcube/roundcubemail/archive/refs/tags/${RC_VERSION}.tar.gz" \
+        -O "${TMPDIR_RC}/rc.tar.gz"
+
+    mkdir -p "${RC_PASSWORD_DIR}"
+    tar -xzf "${TMPDIR_RC}/rc.tar.gz" -C "${TMPDIR_RC}" 2>/dev/null || true
+    PLUGIN_SRC=$(find "${TMPDIR_RC}" -type f -name "password.php" -path "*/plugins/password/*" | head -1)
+    if [[ -n "$PLUGIN_SRC" ]]; then
+        cp -r "$(dirname "$PLUGIN_SRC")/." "${RC_PASSWORD_DIR}/"
+        success "Password plugin downloaded from Roundcube ${RC_VERSION} release."
+    else
+        warn "Could not extract password plugin from release tarball."
+    fi
+    rm -rf "${TMPDIR_RC}"
 fi
 
-cd /usr/share/roundcube
-COMPOSER_ALLOW_SUPERUSER=1 composer require --no-interaction roundcube/plugin-installer roundcube/password \
-    || warn "composer install of password plugin failed"
-
-# Write password plugin config
-cat > /usr/share/roundcube/plugins/password/config.inc.php << 'PWEOF'
+if [[ -f "${RC_PASSWORD_DIR}/password.php" ]]; then
+    cat > "${RC_PASSWORD_DIR}/config.inc.php" << 'PWEOF'
 <?php
 $config['password_driver'] = 'dovecotpasswd';
 $config['password_dovecotpasswd_file'] = '/etc/dovecot/users';
 $config['password_minimum_length'] = 8;
 $config['password_confirm_current'] = true;
 PWEOF
-
-chown -R www-data:www-data /usr/share/roundcube/plugins/password 2>/dev/null || true
-success "Roundcube password plugin installed."
+    chown -R www-data:www-data "${RC_PASSWORD_DIR}" 2>/dev/null || true
+    success "Roundcube password plugin configured."
+else
+    warn "Password plugin not installed — users can change passwords via the portal."
+fi
 
 # Ensure Roundcube SQLite DB directory exists with correct ownership
 ROUNDCUBE_DB_DIR="/var/lib/roundcube/db"
